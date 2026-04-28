@@ -28,6 +28,8 @@ async def subscribe_to_ticker(websocket):
     return subscription
 
 
+
+
 async def process_message(
     message: str,
     redis_client,
@@ -59,14 +61,10 @@ async def process_message(
     # Store analytics in a dedicated Redis hash per market:
     # key: market:{ticker}, fields: price, bid, ask, spread, volume_1s, volume_10s, volume_60s, momentum, imbalance, last_trade_ts
     key = f"market:{ticker}"
-    try:
-        await redis_client.hset(
-            key,
-            mapping={k: str(v) for k, v in analytics.items()},
-        )
-        await redis_client.expire(key, 60)
-    except Exception as e:
-        print("Redis HSET error:", e)
+    async with redis_client.pipeline(transaction=True) as pipe:
+        pipe.hset(key, mapping={k: str(v) for k, v in analytics.items()})
+        pipe.expire(key, 60)
+        await pipe.execute()
 
     return {"type": "ticker", "msg": {**msg, **analytics}}
 

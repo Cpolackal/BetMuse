@@ -6,6 +6,7 @@ Currently provides:
 """
 import os
 from typing import Dict
+from datetime import datetime, timezone
 
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -25,6 +26,8 @@ def build_websocket_auth_headers() -> Dict[str, str] | None:
 
     Returns a dict with the three required WS headers, or None if config is missing.
     """
+
+
     api_key = os.getenv("KALSHI_API_KEY")
     key_path = os.getenv("KALSHI_PRIVATE_KEY_PATH", "keys/kalshi-socket.pem")
     if not api_key or not os.path.isfile(key_path):

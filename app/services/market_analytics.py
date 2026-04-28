@@ -33,13 +33,16 @@ def compute_market_analytics(ticker: str, msg: Dict[str, Any]) -> Dict[str, Any]
         # Assume ts is seconds since epoch; if it's something else, this still increases monotonically.
         ts = float(ts)
 
-    price_raw = msg.get("price")
-    price: float = float(price_raw) / 100.0 if isinstance(price_raw, (int, float)) else float("nan")
+    def to_float(v):
+        try:
+            return float(v) if v is not None else float("nan")
+        except (TypeError, ValueError):
+            return float("nan")
 
-    bid_raw = msg.get("yes_bid")
-    ask_raw = msg.get("yes_ask")
-    bid = float(bid_raw) / 100.0 if isinstance(bid_raw, (int, float)) else float("nan")
-    ask = float(ask_raw) / 100.0 if isinstance(ask_raw, (int, float)) else float("nan")
+    price = to_float(msg.get("price_dollars"))
+    bid = to_float(msg.get("yes_bid_dollars"))
+    ask = to_float(msg.get("yes_ask_dollars"))
+
 
     spread = ask - bid if not any(map(lambda v: v != v, (bid, ask))) else float("nan")  # NaN check via v!=v
 
