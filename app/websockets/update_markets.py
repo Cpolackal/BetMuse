@@ -3,12 +3,13 @@ Kalshi WebSocket client: connect, subscribe to ticker, and delegate
 per-market analytics updates to the market_analytics service.
 """
 import asyncio
+from collections import defaultdict
 import json
 import os
 from typing import Dict, Any
-
+import redis.asyncio as redis
 import websockets
-
+from app.core.contract_buffer import contract_buffer, Tick
 from app.services.market_analytics import compute_market_analytics
 from app.services.kalshi_auth_service import build_websocket_auth_headers
 
@@ -26,6 +27,43 @@ async def subscribe_to_ticker(websocket):
     }
     await websocket.send(json.dumps(subscription))
     return subscription
+
+async def buffer_maintainer(redis_client, active_markets):
+    while True:
+        result = await redis_client.xreadgroup(
+            groupname = "buffer",
+            consumername="buff-1",
+            streams={"ticks": ">"},
+            count=100,
+            block=5000,
+        )
+        _, entries = result[0]
+        for entry in entries:
+            if(entry.market not in active_markets):
+                nxt = contract_buffer()
+                active_markets[entry.market] = nxt
+                ticked = Tick.model_validate_json(entry)
+                nxt.push(ticked)
+        
+
+
+
+async def setup_stream(redis_client):
+    groups = ["buffer_maintainer", "alert_engine", "pattern_detector", "db_writer"]
+    for group in groups:
+        try:
+            await redis_client.xgroup_create(
+                "ticks",
+                group,
+                id="$",
+                mkstream = True
+            )
+            print("created group {group}")
+        except Exception as e:
+            if "BUSYGROUP" in str(e):
+                print(f"Group {group} already exists")
+            else:
+                raise
 
 
 
@@ -61,29 +99,32 @@ async def process_message(
     # Store analytics in a dedicated Redis hash per market:
     # key: market:{ticker}, fields: price, bid, ask, spread, volume_1s, volume_10s, volume_60s, momentum, imbalance, last_trade_ts
     key = f"market:{ticker}"
-    async with redis_client.pipeline(transaction=True) as pipe:
-        pipe.hset(key, mapping={k: str(v) for k, v in analytics.items()})
-        pipe.expire(key, 60)
-        await pipe.execute()
+    await redis_client.xadd(
+        "ticks",
+        {
+            "market": key,
+            "price": analytics["price"],
+            "bid": analytics["bid"],
+            "ask": analytics["ask"],
+            "spread": analytics["spread"],
+            "volume_1s": analytics["volume_1s"],
+            "volume_10s": analytics["volume_10s"],
+            "volume_60s": analytics["volume_60s"],
+            "imbalance": analytics["imbalance"],
+            "momentum": analytics["momentum"],
+            "last_trade_ts": analytics["last_trade_ts"],
+        },
+        maxlen=10000
+    )
 
     return {"type": "ticker", "msg": {**msg, **analytics}}
 
-
-async def run_websocket_client():
-    """Connect to Kalshi WS, subscribe to ticker, and maintain per-market analytics in Redis."""
-    redis_url = os.getenv("REDIS_URL")
-    if not redis_url:
-        raise RuntimeError("REDIS_URL is not set; required for Redis analytics")
-
-    import redis.asyncio as redis
-    redis_client = redis.from_url(redis_url, decode_responses=True)
-
-    # Build auth headers for Kalshi WS (required for this endpoint)
+async def ws_loop(redis_client):
+        # Build auth headers for Kalshi WS (required for this endpoint)
     headers = build_websocket_auth_headers()
     extra_headers = list(headers.items()) if headers else []
     print("beginning connection to ws")
-    try:
-        async with websockets.connect(
+    async with websockets.connect(
             WS_URL,
             additional_headers=extra_headers,
             ping_interval=20,
@@ -103,8 +144,28 @@ async def run_websocket_client():
                         print("ticker:", ticker, price)
                 except Exception as e:
                     print("Error processing message:", e)
+
+
+
+
+async def run_websocket_client():
+    """Connect to Kalshi WS, subscribe to ticker, and maintain per-market analytics in Redis."""
+
+    active_markets = {}
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        raise RuntimeError("REDIS_URL is not set; required for Redis analytics")
+    redis_client = redis.from_url(redis_url, decode_responses=True)
+
+    await setup_stream(redis_client)
+    try:
+        await asyncio.gather(
+            ws_loop(redis_client),
+            buffer_maintainer(redis_client, active_markets),
+            alert_engine(redis_client),
+            db_writer(redis_client),
+        )
     finally:
-        print("reached finally")
         await redis_client.aclose()
 
 

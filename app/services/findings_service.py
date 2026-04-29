@@ -19,5 +19,6 @@ async def compute_findings (ticker: str ) -> dict[str, any]:
     data = await redis_client.hgetall(f"market:{ticker}")
     if not data:
         return "No current data for that market."
+    
 
     
