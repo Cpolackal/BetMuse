@@ -1,9 +1,7 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db.models.market import market_snapshots as MarketSnapshot
-
-
-def get_market(db: Session, id: int):
-    return db.get(MarketSnapshot, id)
+from app.core.contract_buffer import Tick
 
 
 def prev_price(db: Session, ticker: str):
@@ -15,7 +13,7 @@ def prev_price(db: Session, ticker: str):
     )
 
 
-def set_market(db: Session, market_obj: dict):
+def set_market(db: Session, market_obj: Tick):
     """
     Persist a single market snapshot from the external API response.
     `market_obj` is expected to be a dict from the Kalshi API.
@@ -55,7 +53,7 @@ def set_market(db: Session, market_obj: dict):
         no_bid=market_obj.get("no_bid_dollars"),
         no_ask=market_obj.get("no_ask_dollars"),
         prev_yes=prev_yes,
-        volume=market_obj.get("volume_fp"),
+        volume_60s=market_obj.get("volume_fp"),
         open_interest=market_obj.get("open_interest_fp"),
         liquidity=market_obj.get("liquidity_dollars"),
         result=norm_result,
@@ -65,3 +63,51 @@ def set_market(db: Session, market_obj: dict):
     db.commit()
     db.refresh(db_market)
     return db_market
+
+
+def bulk_insert_ticks(db: Session, ticks: list[Tick]):
+    tickers = {tick.market for tick in ticks}
+
+    subq = (
+        db.query(MarketSnapshot.ticker, func.max(MarketSnapshot.id).label("max_id"))
+        .filter(MarketSnapshot.ticker.in_(tickers))
+        .group_by(MarketSnapshot.ticker)
+        .subquery()
+    )
+    prev_yes_map: dict[str, float] = {
+        row.ticker: row.yes_bid
+        for row in (
+            db.query(MarketSnapshot.ticker, MarketSnapshot.yes_bid)
+            .join(subq, MarketSnapshot.id == subq.c.max_id)
+            .all()
+        )
+    }
+
+    snapshots = []
+    for tick in ticks:
+        prev_yes = prev_yes_map.get(tick.market, tick.bid)
+        snapshots.append(MarketSnapshot(
+            ticker=tick.market,
+            last_price=tick.price,
+            yes_bid=tick.bid,
+            yes_ask=tick.ask,
+            no_bid=tick.no_bid,
+            no_ask=tick.no_ask,
+            liquidity=tick.liquidity,
+            open_interest=tick.open_interest,
+            volume_1s=tick.volume_1s,
+            volume_10s=tick.volume_10s,
+            volume_60s=tick.volume_60s,
+            spread=tick.spread,
+            imbalance=tick.imbalance,
+            momentum=tick.momentum,
+            last_trade_ts=tick.last_trade_ts,
+            bid_size=tick.bid_size,
+            ask_size=tick.ask_size,
+            last_trade_size=tick.last_trade_size,
+            prev_yes=prev_yes,
+        ))
+        prev_yes_map[tick.market] = tick.bid
+
+    db.add_all(snapshots)
+    db.commit()

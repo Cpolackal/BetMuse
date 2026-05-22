@@ -45,10 +45,17 @@ def compute_market_analytics(ticker: str, msg: Dict[str, Any]) -> Dict[str, Any]
 
 
     spread = ask - bid if not any(map(lambda v: v != v, (bid, ask))) else float("nan")  # NaN check via v!=v
+    no_bid = 1.0 - ask if ask == ask else float("nan")
+    no_ask = 1.0 - bid if bid == bid else float("nan")
+
+    bid_size = to_float(msg.get("bid_size_fp"))
+    ask_size = to_float(msg.get("ask_size_fp"))
+    valid = lambda v: v == v  # NaN check
+    liquidity = (bid_size * bid) + (ask_size * ask) if all(map(valid, (bid_size, bid, ask_size, ask))) else float("nan")
 
     # Use cumulative volume if available; otherwise treat as 0
-    cum_vol_raw = msg.get("volume")
-    cum_vol = float(cum_vol_raw) if isinstance(cum_vol_raw, (int, float)) else 0.0
+    cum_vol_raw = msg.get("volume_fp")
+    cum_vol = float(cum_vol_raw) if cum_vol_raw is not None else 0.0
 
     history = markets_history.setdefault(ticker, deque())
     history.append((ts, price, cum_vol))
@@ -90,6 +97,12 @@ def compute_market_analytics(ticker: str, msg: Dict[str, Any]) -> Dict[str, Any]
     else:
         imbalance = 0.0
 
+    def to_opt_float(v) -> float | None:
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
     return {
         "price": price,
         "bid": bid,
@@ -101,5 +114,14 @@ def compute_market_analytics(ticker: str, msg: Dict[str, Any]) -> Dict[str, Any]
         "momentum": momentum,
         "imbalance": imbalance,
         "last_trade_ts": int(ts),
+        "no_bid": no_bid,
+        "no_ask": no_ask,
+        "liquidity": liquidity,
+        "open_interest": to_opt_float(msg.get("open_interest_fp")),
+        "dollar_volume": msg.get("dollar_volume"),
+        "dollar_open_interest": msg.get("dollar_open_interest"),
+        "bid_size": to_opt_float(msg.get("bid_size_fp")),
+        "ask_size": to_opt_float(msg.get("ask_size_fp")),
+        "last_trade_size": to_opt_float(msg.get("last_trade_size_fp")),
     }
 

@@ -13,6 +13,15 @@ class Tick(BaseModel):
     imbalance: float
     momentum: float
     last_trade_ts: int
+    no_bid: float | None = None
+    no_ask: float | None = None
+    liquidity: float | None = None
+    open_interest: float | None = None
+    dollar_volume: int | None = None
+    dollar_open_interest: int | None = None
+    bid_size: float | None = None
+    ask_size: float | None = None
+    last_trade_size: float | None = None
 
 
 

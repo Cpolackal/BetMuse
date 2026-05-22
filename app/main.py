@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
     # Start Kalshi WebSocket client in background when enabled
     ws_task = None
     if os.getenv("KALSHI_WS_RUN", "").strip().lower() in ("1", "true", "yes"):
-        from app.websockets.update_markets import run_websocket_client
+        from app.runner import run_websocket_client
         ws_task = asyncio.create_task(run_websocket_client())
     yield
     if ws_task and not ws_task.done():
