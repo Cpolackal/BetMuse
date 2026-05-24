@@ -1,3 +1,4 @@
+import time
 from collections import deque
 from pydantic import BaseModel
 
@@ -30,9 +31,11 @@ class contract_buffer():
 
     def __init__(self, maxlen=600):
         self.items = deque(maxlen=600)
+        self.last_seen: float = time.monotonic()
 
     def push(self, tick: Tick):
         self.items.append(tick)
+        self.last_seen = time.monotonic()
     
     def latest(self):
         return self.items[-1] if self.ticks else None

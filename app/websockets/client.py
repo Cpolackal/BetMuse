@@ -37,7 +37,7 @@ async def process_message(message: str, redis_client) -> Dict[str, Any] | None:
     analytics = compute_market_analytics(ticker, msg)
 
     tick = Tick(
-        market=f"market:{ticker}",
+        market=ticker,
         price=analytics["price"],
         bid=analytics["bid"],
         ask=analytics["ask"],

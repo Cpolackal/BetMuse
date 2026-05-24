@@ -26,8 +26,7 @@ async def buffer_maintainer(redis_client, active_markets: dict):
                     nxt = contract_buffer()
                     active_markets[ticked.market] = nxt
                     nxt.push(ticked)
-                    ticker = ticked.market.removeprefix("market:")
-                    market_data = await fetch_market(ticker)
+                    market_data = await fetch_market(ticked.market)
                     if market_data:
                         db = SessionLocal()
                         try:

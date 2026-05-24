@@ -1,10 +1,9 @@
-from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.db.models.market import market_snapshots as MarketSnapshot
+from app.db.models.market import market_meta as MarketMeta, market_snapshots as MarketSnapshot
 from app.core.contract_buffer import Tick
 
 
-def prev_price(db: Session, ticker: str):
+def latest_snapshot(db: Session, ticker: str):
     return (
         db.query(MarketSnapshot)
         .filter(MarketSnapshot.ticker == ticker)
@@ -12,22 +11,30 @@ def prev_price(db: Session, ticker: str):
         .first()
     )
 
+def get_unresolved_markets(db: Session):
+    from datetime import datetime, timezone
+    return (
+        db.query(MarketMeta)
+        .filter(MarketMeta.result.is_(None))
+        .filter(MarketMeta.close_time.isnot(None))
+        .filter(MarketMeta.close_time < datetime.now(timezone.utc))
+        .all()
+    )
 
-def set_market(db: Session, market_obj: Tick):
-    """
-    Persist a single market snapshot from the external API response.
-    `market_obj` is expected to be a dict from the Kalshi API.
-    """
+def set_market(db: Session, market_obj: dict):
     ticker = market_obj.get("ticker")
+    if not ticker:
+        return
 
-    # Normalize result to a proper boolean / NULL for the DB
+    if db.query(MarketMeta).filter(MarketMeta.ticker == ticker).first():
+        return
+
     raw_result = market_obj.get("result")
     if raw_result in ("", None):
         norm_result = None
     elif isinstance(raw_result, bool):
         norm_result = raw_result
     elif isinstance(raw_result, str):
-        # Map common string values to booleans; otherwise store NULL
         lowered = raw_result.lower()
         if lowered in ("yes", "true", "1"):
             norm_result = True
@@ -37,56 +44,30 @@ def set_market(db: Session, market_obj: Tick):
             norm_result = None
     else:
         norm_result = None
-    prev_snapshot = prev_price(db, ticker) if ticker else None
-    prev_yes = prev_snapshot.yes_bid if prev_snapshot else None
 
-    db_market = MarketSnapshot(
+    db.add(MarketMeta(
         ticker=ticker,
         event_ticker=market_obj.get("event_ticker"),
         title=market_obj.get("title"),
         open_time=market_obj.get("open_time"),
         close_time=market_obj.get("close_time"),
-        # Kalshi uses *_dollars / *_fp fields; map them into our columns
-        last_price=market_obj.get("last_price_dollars"),
-        yes_bid=market_obj.get("yes_bid_dollars"),
-        yes_ask=market_obj.get("yes_ask_dollars"),
-        no_bid=market_obj.get("no_bid_dollars"),
-        no_ask=market_obj.get("no_ask_dollars"),
-        prev_yes=prev_yes,
-        volume_60s=market_obj.get("volume_fp"),
-        open_interest=market_obj.get("open_interest_fp"),
-        liquidity=market_obj.get("liquidity_dollars"),
         result=norm_result,
-    )
-
-    db.add(db_market)
+    ))
     db.commit()
-    db.refresh(db_market)
-    return db_market
+
+
+def resolve_market(db: Session, ticker: str, result: bool) -> bool:
+    market = db.query(MarketMeta).filter(MarketMeta.ticker == ticker).first()
+    if not market:
+        return False
+    market.result = result
+    db.commit()
+    return True
 
 
 def bulk_insert_ticks(db: Session, ticks: list[Tick]):
-    tickers = {tick.market for tick in ticks}
-
-    subq = (
-        db.query(MarketSnapshot.ticker, func.max(MarketSnapshot.id).label("max_id"))
-        .filter(MarketSnapshot.ticker.in_(tickers))
-        .group_by(MarketSnapshot.ticker)
-        .subquery()
-    )
-    prev_yes_map: dict[str, float] = {
-        row.ticker: row.yes_bid
-        for row in (
-            db.query(MarketSnapshot.ticker, MarketSnapshot.yes_bid)
-            .join(subq, MarketSnapshot.id == subq.c.max_id)
-            .all()
-        )
-    }
-
-    snapshots = []
-    for tick in ticks:
-        prev_yes = prev_yes_map.get(tick.market, tick.bid)
-        snapshots.append(MarketSnapshot(
+    db.add_all([
+        MarketSnapshot(
             ticker=tick.market,
             last_price=tick.price,
             yes_bid=tick.bid,
@@ -105,9 +86,8 @@ def bulk_insert_ticks(db: Session, ticks: list[Tick]):
             bid_size=tick.bid_size,
             ask_size=tick.ask_size,
             last_trade_size=tick.last_trade_size,
-            prev_yes=prev_yes,
-        ))
-        prev_yes_map[tick.market] = tick.bid
-
-    db.add_all(snapshots)
+        )
+        for tick in ticks
+    ])
     db.commit()
+

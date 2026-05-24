@@ -5,10 +5,11 @@ from app.core.contract_buffer import Tick
 from app.db.crud import bulk_insert_ticks
 from app.db.session import SessionLocal
 
-BATCH_SIZE = 100
+BATCH_SIZE = 5
 
 
-async def db_writer(redis_client, dblist: deque[Tick]):
+async def db_writer(redis_client):
+    dblist: deque[Tick] = deque()
     while True:
         result = await redis_client.xreadgroup(
             groupname="db_writer",

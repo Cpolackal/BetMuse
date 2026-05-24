@@ -1,9 +1,9 @@
 import asyncio
-from collections import deque
 import os
 
 import redis.asyncio as redis
 from app.websockets.client import ws_loop
+from app.workers.backstop import backstop
 from app.workers.buffer_maintainer import buffer_maintainer
 from app.workers.db_writer import db_writer
 
@@ -23,7 +23,6 @@ async def setup_stream(redis_client):
 
 async def run_websocket_client():
     active_markets = {}
-    dblist = deque()
 
     redis_url = os.getenv("REDIS_URL")
     if not redis_url:
@@ -35,7 +34,8 @@ async def run_websocket_client():
         await asyncio.gather(
             ws_loop(redis_client),
             buffer_maintainer(redis_client, active_markets),
-            db_writer(redis_client, dblist),
+            db_writer(redis_client),
+            backstop(active_markets),
         )
     finally:
         await redis_client.aclose()
