@@ -3,13 +3,14 @@ import os
 
 import redis.asyncio as redis
 from app.websockets.client import ws_loop
+from app.workers.alert_engine import alert_engine
 from app.workers.backstop import backstop
 from app.workers.buffer_maintainer import buffer_maintainer
 from app.workers.db_writer import db_writer
 
 
 async def setup_stream(redis_client):
-    groups = ["buffer_maintainer", "alert_engine", "pattern_detector", "db_writer"]
+    groups = ["buffer_maintainer", "alert_engine", "pattern_detector"]
     for group in groups:
         try:
             await redis_client.xgroup_create("ticks", group, id="$", mkstream=True)
@@ -34,7 +35,8 @@ async def run_websocket_client():
         await asyncio.gather(
             ws_loop(redis_client),
             buffer_maintainer(redis_client, active_markets),
-            db_writer(redis_client),
+            alert_engine(redis_client, active_markets),
+            db_writer(active_markets),
             backstop(active_markets),
         )
     finally:

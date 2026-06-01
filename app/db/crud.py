@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 from app.db.models.market import market_meta as MarketMeta, market_snapshots as MarketSnapshot
 from app.core.contract_buffer import Tick
@@ -45,9 +47,13 @@ def set_market(db: Session, market_obj: dict):
     else:
         norm_result = None
 
+    event_ticker = market_obj.get("event_ticker")
+    series_ticker = event_ticker.split("-")[0] if event_ticker else None
+
     db.add(MarketMeta(
         ticker=ticker,
-        event_ticker=market_obj.get("event_ticker"),
+        event_ticker=event_ticker,
+        series_ticker=series_ticker,
         title=market_obj.get("title"),
         open_time=market_obj.get("open_time"),
         close_time=market_obj.get("close_time"),
@@ -66,9 +72,11 @@ def resolve_market(db: Session, ticker: str, result: bool) -> bool:
 
 
 def bulk_insert_ticks(db: Session, ticks: list[Tick]):
+    now = datetime.now(timezone.utc)
     db.add_all([
         MarketSnapshot(
             ticker=tick.market,
+            snapshot_time=now,
             last_price=tick.price,
             yes_bid=tick.bid,
             yes_ask=tick.ask,
@@ -76,12 +84,6 @@ def bulk_insert_ticks(db: Session, ticks: list[Tick]):
             no_ask=tick.no_ask,
             liquidity=tick.liquidity,
             open_interest=tick.open_interest,
-            volume_1s=tick.volume_1s,
-            volume_10s=tick.volume_10s,
-            volume_60s=tick.volume_60s,
-            spread=tick.spread,
-            imbalance=tick.imbalance,
-            momentum=tick.momentum,
             last_trade_ts=tick.last_trade_ts,
             bid_size=tick.bid_size,
             ask_size=tick.ask_size,

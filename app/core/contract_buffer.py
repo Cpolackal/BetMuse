@@ -1,3 +1,4 @@
+from itertools import islice
 import time
 from collections import deque
 from pydantic import BaseModel
@@ -38,9 +39,11 @@ class contract_buffer():
         self.last_seen = time.monotonic()
     
     def latest(self):
-        return self.items[-1] if self.ticks else None
-    
+        return self.items[-1] if self.items else None
+
     def len(self):
         return len(self.items)
 
-
+    def tail(self, count: int) -> list:
+        start = max(0, self.len() - count)
+        return list(islice(self.items, start, self.len()))
