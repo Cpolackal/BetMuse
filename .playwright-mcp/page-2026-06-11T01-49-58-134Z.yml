@@ -1,0 +1,10 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]: BETMUSE
+    - generic [ref=e6]: "|"
+    - generic [ref=e7]: prediction market analytics
+  - generic [ref=e8]:
+    - generic [ref=e10]:
+      - img [ref=e11]
+      - textbox "Search markets by name..." [ref=e14]
+    - generic [ref=e15]: search for a market above to view analytics

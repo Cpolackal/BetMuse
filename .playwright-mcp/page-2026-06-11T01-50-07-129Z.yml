@@ -1,0 +1,54 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]: BETMUSE
+    - generic [ref=e6]: "|"
+    - generic [ref=e7]: prediction market analytics
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - img [ref=e11]
+        - textbox "Search markets by name..." [ref=e14]: BTC price up in next 15 mins?
+        - button "✕" [ref=e16] [cursor=pointer]
+      - generic [ref=e17]:
+        - generic [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: BTC price up in next 15 mins?
+          - generic [ref=e20]: KXBTC15M-26JUN102200-00
+        - generic [ref=e21] [cursor=pointer]:
+          - generic [ref=e22]: BTC price up in next 15 mins?
+          - generic [ref=e23]: KXBTC15M-26JUN102145-45
+        - generic [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: BTC price up in next 15 mins?
+          - generic [ref=e26]: KXBTC15M-26MAY231630-30
+        - generic [ref=e27] [cursor=pointer]:
+          - generic [ref=e28]: BTC price up in next 15 mins?
+          - generic [ref=e29]: KXBTC15M-26MAY231615-15
+        - generic [ref=e30]: 4 results · only active markets shown
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]: BTC price up in next 15 mins?
+          - generic [ref=e35]:
+            - generic [ref=e36]: KXBTC15M-26JUN102145-45
+            - generic [ref=e37]: closes Jun 11, 2026
+            - generic [ref=e38]: · polled 21:50:06
+        - generic [ref=e39]: OPEN
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: Price
+          - generic [ref=e43]: —
+        - generic [ref=e44]:
+          - generic [ref=e45]: Spread
+          - generic [ref=e46]: —
+        - generic [ref=e47]:
+          - generic [ref=e48]: Imbalance
+          - generic [ref=e49]: —
+        - generic [ref=e50]:
+          - generic [ref=e51]: Momentum
+          - generic [ref=e52]: —
+        - generic [ref=e53]:
+          - generic [ref=e54]: Liquidity
+          - generic [ref=e55]: —
+        - generic [ref=e56]:
+          - generic [ref=e57]: Open Interest
+          - generic [ref=e58]: —
+      - generic [ref=e59]: no snapshots yet — waiting for data

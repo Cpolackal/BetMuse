@@ -1,0 +1,23 @@
+[      81ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=e1d4c098:20100
+[   98090ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  128088ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  158087ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  188088ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  218088ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  248087ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  278086ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  308087ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  338089ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  368086ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  398087ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  428087ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  458087ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  488087ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  518086ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  548086ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  578085ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  601813ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:864
+[  608086ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/markets/KXBTC15M-26JUN102145-45/snapshots?limit=300:0
+[  642499ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:20100
+[ 1232366ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:864
+[ 1232573ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:20100
