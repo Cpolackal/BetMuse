@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from app.services.market_service import fetch_markets
 from app.db.crud import set_market
 from app.db.session import get_db
-from app.core.contract_buffer import Tick
 import asyncio
 
 router = APIRouter()

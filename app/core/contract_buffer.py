@@ -33,6 +33,7 @@ class contract_buffer():
     def __init__(self, maxlen=600):
         self.items = deque(maxlen=600)
         self.last_seen: float = time.monotonic()
+        self.last_written = None
 
     def push(self, tick: Tick):
         self.items.append(tick)

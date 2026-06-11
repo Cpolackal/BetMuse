@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
+from sqlalchemy import Column, Index, Integer, String, Float, DateTime, Boolean
 from app.db.base import Base
 
 
@@ -32,3 +32,6 @@ class market_snapshots(Base):
     ask_size = Column(Float)
     last_trade_size = Column(Float)
     last_trade_ts = Column(Float)
+
+
+Index("ix_snapshots_ticker_time", market_snapshots.ticker, market_snapshots.snapshot_time)

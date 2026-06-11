@@ -10,7 +10,7 @@ from app.workers.db_writer import db_writer
 
 
 async def setup_stream(redis_client):
-    groups = ["buffer_maintainer", "alert_engine", "pattern_detector"]
+    groups = ["buffer_maintainer", "alert_engine"]
     for group in groups:
         try:
             await redis_client.xgroup_create("ticks", group, id="$", mkstream=True)
@@ -24,7 +24,6 @@ async def setup_stream(redis_client):
 
 async def run_websocket_client():
     active_markets = {}
-
     redis_url = os.getenv("REDIS_URL")
     if not redis_url:
         raise RuntimeError("REDIS_URL is not set")
@@ -35,7 +34,7 @@ async def run_websocket_client():
         await asyncio.gather(
             ws_loop(redis_client),
             buffer_maintainer(redis_client, active_markets),
-            alert_engine(redis_client, active_markets),
+            alert_engine(redis_client),
             db_writer(active_markets),
             backstop(active_markets),
         )

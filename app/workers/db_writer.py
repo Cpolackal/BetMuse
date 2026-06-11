@@ -11,14 +11,16 @@ async def db_writer(active_markets: dict):
         await asyncio.sleep(SNAPSHOT_INTERVAL)
         if not active_markets:
             continue
-
-        ticks = [
-            buf.latest()
-            for buf in active_markets.values()
-            if buf.latest() is not None
+        dirty = [
+            buf for buf in active_markets.values()
+            if buf.latest() is not None and buf.last_seen != buf.last_written
         ]
-        if not ticks:
+        if not dirty:
             continue
+
+        ticks = [buf.latest() for buf in dirty]
+        for buf in dirty:
+            buf.last_written = buf.last_seen
 
         db = SessionLocal()
         try:
