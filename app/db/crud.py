@@ -88,8 +88,55 @@ def bulk_insert_ticks(db: Session, ticks: list[Tick]):
             bid_size=tick.bid_size,
             ask_size=tick.ask_size,
             last_trade_size=tick.last_trade_size,
+            spread=tick.spread,
+            imbalance=tick.imbalance,
+            momentum=tick.momentum,
+            volume_1s=tick.volume_1s,
+            volume_10s=tick.volume_10s,
+            volume_60s=tick.volume_60s,
         )
         for tick in ticks
     ])
     db.commit()
+
+
+def search_markets(db: Session, q: str) -> list:
+    return (
+        db.query(MarketMeta)
+        .filter(MarketMeta.title.ilike(f"%{q}%"))
+        .order_by(MarketMeta.close_time.desc())
+        .limit(50)
+        .all()
+    )
+
+
+def get_market(db: Session, ticker: str):
+    return db.query(MarketMeta).filter(MarketMeta.ticker == ticker).first()
+
+
+def purge_snapshots(db: Session) -> int:
+    from sqlalchemy import text
+    result = db.execute(text("""
+        DELETE FROM market_snapshots
+        WHERE snapshot_time < NOW() - INTERVAL '7 days'
+        OR (
+            snapshot_time < NOW() - INTERVAL '48 hours'
+            AND ticker IN (
+                SELECT ticker FROM market_meta WHERE result IS NOT NULL
+            )
+        )
+    """))
+    db.commit()
+    return result.rowcount
+
+
+def get_snapshots(db: Session, ticker: str, limit: int = 200) -> list:
+    rows = (
+        db.query(MarketSnapshot)
+        .filter(MarketSnapshot.ticker == ticker)
+        .order_by(MarketSnapshot.snapshot_time.desc())
+        .limit(limit)
+        .all()
+    )
+    return list(reversed(rows))
 
