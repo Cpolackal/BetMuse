@@ -1,224 +1,679 @@
-import React, { useState } from "react";
-import { API_BASE_URL } from "./config";
+import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  ReferenceLine, ResponsiveContainer,
+} from 'recharts'
 
-function App() {
-  const [health, setHealth] = useState(null);
-  const [healthLoading, setHealthLoading] = useState(false);
-  const [healthError, setHealthError] = useState(null);
+const API = 'http://localhost:8000'
 
-  const [markets, setMarkets] = useState(null);
-  const [marketsLoading, setMarketsLoading] = useState(false);
-  const [marketsError, setMarketsError] = useState(null);
-  const [limit, setLimit] = useState(100);
-  const [cursor, setCursor] = useState("");
+// ─── Threshold constants (mirrors alert_engine.py) ───────────────────────────
+const SPREAD_THRESHOLD    = 0.01
+const IMBALANCE_THRESHOLD = 0.1
+const VOL_THRESHOLD       = 100
+const LIQUIDITY_THRESHOLD = -5.0
 
-  const callHealth = async () => {
-    setHealthLoading(true);
-    setHealthError(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/health`);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      setHealth(JSON.stringify(data, null, 2));
-    } catch (err) {
-      setHealthError(err.message ?? "Unknown error");
-    } finally {
-      setHealthLoading(false);
-    }
-  };
-
-  const callMarkets = async () => {
-    setMarketsLoading(true);
-    setMarketsError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set("limit", String(limit));
-      if (cursor.trim()) {
-        params.set("cursor", cursor.trim());
-      }
-
-      const res = await fetch(`${API_BASE_URL}/markets`);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      // adjust if your response shape is { items: [...] }
-      setMarkets(Array.isArray(data) ? data : data.items ?? []);
-    } catch (err) {
-      setMarketsError(err.message ?? "Unknown error");
-    } finally {
-      setMarketsLoading(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        backgroundColor: "#0f172a",
-        color: "#e5e7eb",
-        padding: "24px",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "960px",
-          margin: "0 auto",
-        }}
-      >
-        <h1 style={{ fontSize: "28px", marginBottom: "8px" }}>BetMuse API Console</h1>
-        <p style={{ marginBottom: "24px", color: "#9ca3af" }}>
-          Very bare-bones UI to hit your FastAPI endpoints.
-        </p>
-
-        {/* Health section */}
-        <section
-          style={{
-            marginBottom: "24px",
-            padding: "16px",
-            borderRadius: "8px",
-            backgroundColor: "#020617",
-            border: "1px solid #1f2937",
-          }}
-        >
-          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>Health Check</h2>
-          <button
-            onClick={callHealth}
-            disabled={healthLoading}
-            style={{
-              padding: "8px 12px",
-              borderRadius: "6px",
-              border: "none",
-              backgroundColor: "#22c55e",
-              color: "#020617",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {healthLoading ? "Checking..." : "GET /health"}
-          </button>
-          {healthError && (
-            <div style={{ marginTop: "12px", color: "#f97316" }}>
-              Error: {healthError}
-            </div>
-          )}
-          {health && (
-            <pre
-              style={{
-                marginTop: "12px",
-                padding: "12px",
-                borderRadius: "6px",
-                backgroundColor: "#020617",
-                border: "1px solid #1f2937",
-                fontSize: "13px",
-                overflowX: "auto",
-              }}
-            >
-              {health}
-            </pre>
-          )}
-        </section>
-
-        {/* Markets section */}
-        <section
-          style={{
-            marginBottom: "24px",
-            padding: "16px",
-            borderRadius: "8px",
-            backgroundColor: "#020617",
-            border: "1px solid #1f2937",
-          }}
-        >
-          <h2 style={{ fontSize: "20px", marginBottom: "12px" }}>Markets</h2>
-
-          <div style={{ display: "flex", gap: "12px", marginBottom: "12px", flexWrap: "wrap" }}>
-            <label style={{ fontSize: "14px" }}>
-              Limit:&nbsp;
-              <input
-                type="number"
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value) || 0)}
-                style={{
-                  padding: "4px 6px",
-                  borderRadius: "4px",
-                  border: "1px solid #4b5563",
-                  backgroundColor: "#020617",
-                  color: "#e5e7eb",
-                  width: "80px",
-                }}
-              />
-            </label>
-
-            <label style={{ fontSize: "14px" }}>
-              Cursor:&nbsp;
-              <input
-                type="text"
-                value={cursor}
-                onChange={(e) => setCursor(e.target.value)}
-                style={{
-                  padding: "4px 6px",
-                  borderRadius: "4px",
-                  border: "1px solid #4b5563",
-                  backgroundColor: "#020617",
-                  color: "#e5e7eb",
-                  minWidth: "160px",
-                }}
-                placeholder="optional"
-              />
-            </label>
-
-            <button
-              onClick={callMarkets}
-              disabled={marketsLoading}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "6px",
-                border: "none",
-                backgroundColor: "#3b82f6",
-                color: "#e5e7eb",
-                cursor: "pointer",
-                fontWeight: 600,
-                alignSelf: "flex-end",
-              }}
-            >
-              {marketsLoading ? "Loading..." : "GET /markets"}
-            </button>
-          </div>
-
-          {marketsError && (
-            <div style={{ marginTop: "12px", color: "#f97316" }}>
-              Error: {marketsError}
-            </div>
-          )}
-
-          {markets && (
-            <pre
-              style={{
-                marginTop: "12px",
-                padding: "12px",
-                borderRadius: "6px",
-                backgroundColor: "#020617",
-                border: "1px solid #1f2937",
-                fontSize: "13px",
-                maxHeight: "320px",
-                overflow: "auto",
-              }}
-            >
-              {JSON.stringify(markets, null, 2)}
-            </pre>
-          )}
-        </section>
-
-        <p style={{ fontSize: "12px", color: "#6b7280" }}>
-          Adjust `API_BASE_URL` in `src/config.ts` and add more sections for new endpoints as needed.
-        </p>
-      </div>
-    </div>
-  );
+// ─── Palette ─────────────────────────────────────────────────────────────────
+const C = {
+  bg:        '#0a0c12',
+  surface:   '#111420',
+  card:      '#161926',
+  border:    '#1f2438',
+  accent:    '#6366f1',
+  accentDim: '#3d3f7a',
+  text:      '#e2e8f0',
+  muted:     '#64748b',
+  dimmer:    '#334155',
+  green:     '#22c55e',
+  red:       '#ef4444',
+  amber:     '#f59e0b',
+  cyan:      '#06b6d4',
+  violet:    '#a78bfa',
 }
 
-export default App;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const toHMS = iso => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toTimeString().slice(0, 8)
+}
+
+const toDate = iso => {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const fmt    = (v, d = 4) => v == null ? '—' : Number(v).toFixed(d)
+const fmtInt = v => v == null ? '—' : Math.round(v).toLocaleString()
+
+// ─── useDebounce ──────────────────────────────────────────────────────────────
+function useDebounce(value, ms = 300) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return debounced
+}
+
+// ─── Custom Tooltip ───────────────────────────────────────────────────────────
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{
+      background: C.surface, border: `1px solid ${C.border}`,
+      padding: '8px 12px', borderRadius: 4,
+      fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
+    }}>
+      <div style={{ color: C.muted, marginBottom: 4 }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ color: p.color || C.text }}>
+          {p.name}: {typeof p.value === 'number' ? p.value.toFixed(4) : p.value}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Tooltip ──────────────────────────────────────────────────────────────────
+function HintTooltip({ text, children }) {
+  const [visible, setVisible] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  const onMove = (e) => setPos({ top: e.clientY + 14, left: e.clientX + 12 })
+
+  return (
+    <>
+      <div onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)}
+        onMouseMove={onMove} style={{ display: 'contents' }}>
+        {children}
+      </div>
+      {visible && (
+        <div style={{
+          position: 'fixed', top: pos.top, left: pos.left, zIndex: 999,
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 5, padding: '8px 11px',
+          maxWidth: 220, fontSize: 11, lineHeight: 1.5,
+          color: C.muted, fontFamily: "'DM Sans', sans-serif",
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          pointerEvents: 'none',
+        }}>
+          {text}
+        </div>
+      )}
+    </>
+  )
+}
+
+// ─── StatCard ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, color, hint }) {
+  const card = (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: 6, padding: '10px 14px', flex: 1, minWidth: 0,
+      cursor: hint ? 'default' : undefined,
+    }}>
+      <div style={{
+        color: C.muted, fontSize: 10,
+        textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4,
+        display: 'flex', alignItems: 'center', gap: 4,
+      }}>
+        {label}
+        {hint && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 12, height: 12, borderRadius: '50%',
+            border: `1px solid ${C.dimmer}`, color: C.dimmer,
+            fontSize: 8, lineHeight: 1, flexShrink: 0,
+          }}>?</span>
+        )}
+      </div>
+      <div style={{
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 18, fontWeight: 600,
+        color: color || C.text,
+      }}>
+        {value}
+      </div>
+    </div>
+  )
+
+  return hint ? <HintTooltip text={hint}>{card}</HintTooltip> : card
+}
+
+// ─── MiniChart wrapper ────────────────────────────────────────────────────────
+function MiniChart({ title, hint, children }) {
+  const header = (
+    <div style={{
+      color: C.muted, fontSize: 10,
+      textTransform: 'uppercase', letterSpacing: '0.08em',
+      marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4,
+    }}>
+      {title}
+      {hint && (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 12, height: 12, borderRadius: '50%',
+          border: `1px solid ${C.dimmer}`, color: C.dimmer,
+          fontSize: 8, lineHeight: 1, flexShrink: 0,
+        }}>?</span>
+      )}
+    </div>
+  )
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: 6, padding: '14px 16px',
+    }}>
+      {hint ? <HintTooltip text={hint}>{header}</HintTooltip> : header}
+      <ResponsiveContainer width="100%" height={180}>
+        {children}
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+const axisStyle = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, fill: C.dimmer }
+const gridProps = { stroke: C.border, strokeDasharray: '2 4' }
+
+// ─── MarketDetail ─────────────────────────────────────────────────────────────
+function MarketDetail({ ticker }) {
+  const [meta, setMeta]         = useState(null)
+  const [snapshots, setSnaps]   = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [lastPoll, setLastPoll] = useState(null)
+
+  const fetchSnaps = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/markets/${ticker}/snapshots?limit=300`)
+      const d = await r.json()
+      const rows = (d.snapshots || []).map(s => ({ ...s, _t: toHMS(s.snapshot_time) }))
+      setSnaps(rows)
+      setLastPoll(new Date().toTimeString().slice(0, 8))
+    } catch {}
+  }, [ticker])
+
+  useEffect(() => {
+    setLoading(true)
+    setSnaps([])
+    setMeta(null)
+    Promise.all([
+      fetch(`${API}/markets/${ticker}`).then(r => r.json()),
+      fetchSnaps(),
+    ]).then(([m]) => {
+      setMeta(m)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [ticker, fetchSnaps])
+
+  useEffect(() => {
+    const id = setInterval(fetchSnaps, 30_000)
+    return () => clearInterval(id)
+  }, [fetchSnaps])
+
+  if (loading) {
+    return (
+      <div style={{
+        color: C.muted, fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 13, padding: 40, textAlign: 'center',
+      }}>
+        loading {ticker}...
+      </div>
+    )
+  }
+
+  const latest = snapshots[snapshots.length - 1] || {}
+
+  const resultBadge = meta?.result === true
+    ? { label: 'YES',  bg: '#14532d', color: C.green }
+    : meta?.result === false
+      ? { label: 'NO',   bg: '#450a0a', color: C.red }
+      : { label: 'OPEN', bg: C.accentDim, color: C.accent }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{
+        background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: 8, padding: '18px 24px', marginBottom: 16,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16,
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 6, lineHeight: 1.3 }}>
+            {meta?.title || ticker}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
+              background: C.accentDim, color: C.accent, padding: '2px 8px', borderRadius: 4,
+            }}>
+              {ticker}
+            </span>
+            <span style={{ color: C.muted, fontSize: 12 }}>closes {toDate(meta?.close_time)}</span>
+            {lastPoll && (
+              <span style={{ color: C.dimmer, fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>
+                · polled {lastPoll}
+              </span>
+            )}
+          </div>
+        </div>
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700,
+          background: resultBadge.bg, color: resultBadge.color,
+          padding: '4px 12px', borderRadius: 4, whiteSpace: 'nowrap',
+        }}>
+          {resultBadge.label}
+        </span>
+      </div>
+
+      {/* Alerts */}
+      <MarketAlerts ticker={ticker} />
+
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <StatCard label="Price" value={fmt(latest.last_price, 3)} color={C.accent}
+          hint="Last traded price in dollars. On Kalshi this represents the probability — $0.65 means the market implies a 65% chance of YES." />
+        <StatCard label="Spread" value={fmt(latest.spread, 4)}
+          color={latest.spread > SPREAD_THRESHOLD ? C.amber : C.text}
+          hint="Difference between the best ask and best bid. A tight spread means high liquidity and low transaction cost. Amber when above the alert threshold." />
+        <StatCard label="Imbalance" value={fmt(latest.imbalance, 4)}
+          color={Math.abs(latest.imbalance || 0) > IMBALANCE_THRESHOLD ? C.amber : C.text}
+          hint="Order book skew: (bid − ask) / (bid + ask). Positive means more buy-side pressure, negative means sell-side. Large values can precede price moves." />
+        <StatCard label="Momentum" value={fmt(latest.momentum, 4)}
+          color={latest.momentum > 0 ? C.green : latest.momentum < 0 ? C.red : C.text}
+          hint="Short-term price velocity — difference between recent price and its 60-second moving average. Green = upward drift, red = downward drift." />
+        <StatCard label="Liquidity" value={fmt(latest.liquidity, 2)}
+          color={(latest.liquidity || 0) <= LIQUIDITY_THRESHOLD ? C.red : C.text}
+          hint="Dollar value of open interest (contracts × price) — a proxy for market depth. Low or rapidly falling values mean capital is leaving the market, making large price moves easier to trigger." />
+        <StatCard label="Open Interest" value={fmtInt(latest.open_interest)}
+          hint="Total number of contracts currently held by market participants. Rising open interest alongside a price move confirms new money entering the position." />
+      </div>
+
+      {/* Charts */}
+      {snapshots.length === 0 ? (
+        <div style={{
+          color: C.muted, textAlign: 'center', padding: 40,
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: 6,
+        }}>
+          no snapshots yet — waiting for data
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+          <MiniChart title="Price" hint="Last traded price in dollars. On Kalshi, price ≈ probability — $0.65 means the market implies a 65% chance of YES. Bid and ask dashes show the current best quotes.">
+            <LineChart data={snapshots}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(3)} />
+              <Tooltip content={<ChartTooltip />} />
+              <Line type="monotone" dataKey="last_price" stroke={C.accent} dot={false} strokeWidth={1.5} name="price" />
+              <Line type="monotone" dataKey="yes_bid"    stroke={C.green}  dot={false} strokeWidth={1}   name="bid"   strokeDasharray="3 2" />
+              <Line type="monotone" dataKey="yes_ask"    stroke={C.red}    dot={false} strokeWidth={1}   name="ask"   strokeDasharray="3 2" />
+            </LineChart>
+          </MiniChart>
+
+          <MiniChart title="Spread" hint="Ask minus bid. A narrow spread means tight liquidity and low transaction cost. The amber threshold line marks when the spread is wide enough to trigger an alert.">
+            <LineChart data={snapshots}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(3)} />
+              <Tooltip content={<ChartTooltip />} />
+              <ReferenceLine y={SPREAD_THRESHOLD} stroke={C.amber} strokeDasharray="4 3" strokeWidth={1}
+                label={{ value: 'thresh', fill: C.amber, fontSize: 9, fontFamily: 'IBM Plex Mono' }} />
+              <Line type="monotone" dataKey="spread" stroke={C.cyan} dot={false} strokeWidth={1.5} name="spread" />
+            </LineChart>
+          </MiniChart>
+
+          <MiniChart title="Imbalance" hint="Order book skew: (bid − ask) / (bid + ask). Positive means more buy pressure, negative means sell pressure. Crossing the amber thresholds can signal a coming price move.">
+            <LineChart data={snapshots}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(2)} />
+              <Tooltip content={<ChartTooltip />} />
+              <ReferenceLine y={0}                    stroke={C.dimmer} strokeDasharray="2 4" strokeWidth={1} />
+              <ReferenceLine y={ IMBALANCE_THRESHOLD} stroke={C.amber}  strokeDasharray="4 3" strokeWidth={1} />
+              <ReferenceLine y={-IMBALANCE_THRESHOLD} stroke={C.amber}  strokeDasharray="4 3" strokeWidth={1} />
+              <Line type="monotone" dataKey="imbalance" stroke={C.violet} dot={false} strokeWidth={1.5} name="imbalance" />
+            </LineChart>
+          </MiniChart>
+
+          <MiniChart title="Momentum" hint="Price change relative to 60 seconds ago. Positive means the market has drifted up recently; negative means it has drifted down. Near zero means the price is stable.">
+            <LineChart data={snapshots}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(3)} />
+              <Tooltip content={<ChartTooltip />} />
+              <ReferenceLine y={0} stroke={C.dimmer} strokeDasharray="2 4" strokeWidth={1} />
+              <Line type="monotone" dataKey="momentum" stroke={C.accent} dot={false} strokeWidth={1.5} name="momentum" />
+            </LineChart>
+          </MiniChart>
+
+          <MiniChart title="Volume (10s)" hint="Contracts traded in the last 10 seconds, computed from the cumulative Kalshi volume counter. Spikes above the red threshold line trigger a volume-spike alert.">
+            <BarChart data={snapshots}>
+              <CartesianGrid {...gridProps} vertical={false} />
+              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={40} />
+              <Tooltip content={<ChartTooltip />} />
+              <ReferenceLine y={VOL_THRESHOLD} stroke={C.red} strokeDasharray="4 3" strokeWidth={1}
+                label={{ value: 'thresh', fill: C.red, fontSize: 9, fontFamily: 'IBM Plex Mono' }} />
+              <Bar dataKey="volume_10s" fill={C.accentDim} name="vol_10s" maxBarSize={6} />
+            </BarChart>
+          </MiniChart>
+
+          <MiniChart title="Liquidity" hint="Dollar value of open interest (contracts × price) — a proxy for market depth when order book size isn't available. Falling values mean capital is leaving the market. Drops below the red line trigger a liquidity-drain alert.">
+            <LineChart data={snapshots}>
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(1)} />
+              <Tooltip content={<ChartTooltip />} />
+              <ReferenceLine y={LIQUIDITY_THRESHOLD} stroke={C.red} strokeDasharray="4 3" strokeWidth={1}
+                label={{ value: 'drain', fill: C.red, fontSize: 9, fontFamily: 'IBM Plex Mono' }} />
+              <Line type="monotone" dataKey="liquidity" stroke={C.green} dot={false} strokeWidth={1.5} name="liquidity" />
+            </LineChart>
+          </MiniChart>
+
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Alert helpers ────────────────────────────────────────────────────────────
+const ALERT_LABELS = {
+  microprice: 'Microprice',
+  volume:     'Volume Spike',
+  imbalance:  'Imbalance',
+  spread:     'Spread',
+  liquidity:  'Liquidity',
+}
+
+const DIRECTION_COLOR = dir => {
+  if (['up', 'buy', 'tightening'].includes(dir)) return C.green
+  if (['down', 'sell', 'drain', 'widening'].includes(dir)) return C.red
+  return C.muted
+}
+
+const fmtAlertValue = (type, value) => {
+  const n = Number(value)
+  if (type === 'volume') return `${n > 0 ? '+' : ''}${Math.round(n)}`
+  return `${n > 0 ? '+' : ''}${n.toFixed(4)}`
+}
+
+const fmtAlertTime = ts => {
+  const d = new Date(Number(ts) * 1000)
+  return d.toTimeString().slice(0, 8)
+}
+
+// ─── MarketAlerts ─────────────────────────────────────────────────────────────
+function MarketAlerts({ ticker }) {
+  const [alerts, setAlerts] = useState([])
+  const [connected, setConnected] = useState(false)
+
+  useEffect(() => {
+    setAlerts([])
+    const es = new EventSource(`${API}/alerts/stream?market=${encodeURIComponent(ticker)}`)
+    es.onopen = () => setConnected(true)
+    es.onerror = () => setConnected(false)
+    es.onmessage = e => {
+      try {
+        const alert = JSON.parse(e.data)
+        setAlerts(prev => [alert, ...prev].slice(0, 50))
+      } catch {}
+    }
+    return () => es.close()
+  }, [ticker])
+
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: 6, marginBottom: 16,
+    }}>
+      <div style={{
+        padding: '10px 14px', borderBottom: `1px solid ${C.border}`,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+          textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted,
+        }}>
+          Signal Alerts
+        </span>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: connected ? C.green : C.dimmer,
+          boxShadow: connected ? `0 0 5px ${C.green}` : 'none',
+          transition: 'background 0.3s',
+        }} />
+      </div>
+
+      {alerts.length === 0 ? (
+        <div style={{
+          padding: '14px 16px',
+          color: C.dimmer, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
+        }}>
+          listening for signals...
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '10px 14px' }}>
+          {alerts.map((a, i) => {
+            const col = DIRECTION_COLOR(a.direction)
+            return (
+              <div key={a.id || i} style={{
+                background: C.surface, border: `1px solid ${col}33`,
+                borderRadius: 5, padding: '6px 10px',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                  fontWeight: 600, color: col,
+                }}>
+                  {ALERT_LABELS[a.type] || a.type}
+                </span>
+                <span style={{
+                  fontSize: 10, color: col,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  background: col + '22', padding: '1px 5px', borderRadius: 3,
+                }}>
+                  {a.direction}
+                </span>
+                <span style={{
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                  color: col, fontWeight: 600,
+                }}>
+                  {fmtAlertValue(a.type, a.value)}
+                </span>
+                <span style={{
+                  fontSize: 10, color: C.dimmer,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                }}>
+                  {fmtAlertTime(a.ts)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [query, setQuery]           = useState('')
+  const [results, setResults]       = useState([])
+  const [searching, setSearching]   = useState(false)
+  const [dropdownOpen, setDropdown] = useState(false)
+  const [selected, setSelected]     = useState(null)
+  const inputRef = useRef(null)
+  const wrapRef  = useRef(null)
+
+  const debounced = useDebounce(query, 300)
+
+  useEffect(() => {
+    if (!debounced.trim()) { setResults([]); setDropdown(false); return }
+    setSearching(true)
+    fetch(`${API}/markets/search?q=${encodeURIComponent(debounced)}`)
+      .then(r => r.json())
+      .then(d => { setResults(d.markets || []); setDropdown(true) })
+      .catch(() => setResults([]))
+      .finally(() => setSearching(false))
+  }, [debounced])
+
+  useEffect(() => {
+    const handler = e => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setDropdown(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const pick = market => {
+    setSelected(market.ticker)
+    setQuery(market.title)
+    setDropdown(false)
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: ${C.bg}; }
+        ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+        input::placeholder { color: ${C.dimmer}; }
+      `}</style>
+
+      {/* Topbar */}
+      <div style={{
+        borderBottom: `1px solid ${C.border}`, padding: '0 32px',
+        display: 'flex', alignItems: 'center', height: 52, gap: 16,
+        background: C.surface,
+      }}>
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
+          color: C.accent, letterSpacing: '0.04em',
+        }}>
+          BETMUSE
+        </span>
+        <span style={{ color: C.border }}>|</span>
+        <span style={{ color: C.muted, fontSize: 12 }}>prediction market analytics</span>
+      </div>
+
+      {/* Main */}
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+
+        {/* Search */}
+        <div ref={wrapRef} style={{ position: 'relative', marginBottom: 28 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: C.surface, border: `1px solid ${dropdownOpen ? C.accentDim : C.border}`,
+            borderRadius: dropdownOpen && results.length ? '6px 6px 0 0' : 6,
+            padding: '10px 16px', transition: 'border-color 0.15s',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e => { setQuery(e.target.value); setSelected(null) }}
+              onFocus={() => results.length && setDropdown(true)}
+              placeholder="Search markets by name..."
+              style={{
+                flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif",
+              }}
+            />
+            {searching && (
+              <span style={{ color: C.muted, fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>
+                searching...
+              </span>
+            )}
+            {query && (
+              <button
+                onClick={() => { setQuery(''); setSelected(null); setResults([]); setDropdown(false) }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: C.dimmer, padding: 0, lineHeight: 1, fontSize: 14,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Dropdown results */}
+          {dropdownOpen && results.length > 0 && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+              background: C.surface, border: `1px solid ${C.accentDim}`,
+              borderTop: `1px solid ${C.border}`, borderRadius: '0 0 6px 6px',
+              maxHeight: 320, overflowY: 'auto',
+            }}>
+              {results.map((m, i) => (
+                <div
+                  key={m.ticker}
+                  onClick={() => pick(m)}
+                  style={{
+                    padding: '10px 16px', cursor: 'pointer',
+                    borderTop: i > 0 ? `1px solid ${C.border}` : 'none',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = C.card}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span style={{
+                    fontSize: 13, color: C.text, flex: 1, minWidth: 0,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {m.title}
+                  </span>
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                    color: C.accent, background: C.accentDim,
+                    padding: '2px 6px', borderRadius: 3, flexShrink: 0,
+                  }}>
+                    {m.ticker}
+                  </span>
+                </div>
+              ))}
+              <div style={{
+                padding: '6px 16px', borderTop: `1px solid ${C.border}`,
+                color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
+              }}>
+                {results.length} result{results.length !== 1 ? 's' : ''} · only active markets shown
+              </div>
+            </div>
+          )}
+
+          {dropdownOpen && results.length === 0 && !searching && query.trim() && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderTop: 'none', borderRadius: '0 0 6px 6px',
+              padding: '12px 16px', color: C.muted, fontSize: 13,
+            }}>
+              no markets found
+            </div>
+          )}
+        </div>
+
+        {/* Detail or placeholder */}
+        {selected
+          ? <MarketDetail key={selected} ticker={selected} />
+          : (
+            <div style={{
+              textAlign: 'center', padding: '80px 24px',
+              color: C.dimmer, fontFamily: "'IBM Plex Mono', monospace", fontSize: 13,
+            }}>
+              search for a market above to view analytics
+            </div>
+          )
+        }
+
+      </div>
+    </div>
+  )
+}
