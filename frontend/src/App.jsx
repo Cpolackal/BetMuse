@@ -75,18 +75,58 @@ const ChartTooltip = ({ active, payload, label }) => {
   )
 }
 
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-function StatCard({ label, value, color }) {
+// ─── Tooltip ──────────────────────────────────────────────────────────────────
+function HintTooltip({ text, children }) {
+  const [visible, setVisible] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  const onMove = (e) => setPos({ top: e.clientY + 14, left: e.clientX + 12 })
+
   return (
+    <>
+      <div onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)}
+        onMouseMove={onMove} style={{ display: 'contents' }}>
+        {children}
+      </div>
+      {visible && (
+        <div style={{
+          position: 'fixed', top: pos.top, left: pos.left, zIndex: 999,
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 5, padding: '8px 11px',
+          maxWidth: 220, fontSize: 11, lineHeight: 1.5,
+          color: C.muted, fontFamily: "'DM Sans', sans-serif",
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          pointerEvents: 'none',
+        }}>
+          {text}
+        </div>
+      )}
+    </>
+  )
+}
+
+// ─── StatCard ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, color, hint }) {
+  const card = (
     <div style={{
       background: C.card, border: `1px solid ${C.border}`,
       borderRadius: 6, padding: '10px 14px', flex: 1, minWidth: 0,
+      cursor: hint ? 'default' : undefined,
     }}>
       <div style={{
         color: C.muted, fontSize: 10,
         textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4,
+        display: 'flex', alignItems: 'center', gap: 4,
       }}>
         {label}
+        {hint && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 12, height: 12, borderRadius: '50%',
+            border: `1px solid ${C.dimmer}`, color: C.dimmer,
+            fontSize: 8, lineHeight: 1, flexShrink: 0,
+          }}>?</span>
+        )}
       </div>
       <div style={{
         fontFamily: "'IBM Plex Mono', monospace",
@@ -97,22 +137,35 @@ function StatCard({ label, value, color }) {
       </div>
     </div>
   )
+
+  return hint ? <HintTooltip text={hint}>{card}</HintTooltip> : card
 }
 
 // ─── MiniChart wrapper ────────────────────────────────────────────────────────
-function MiniChart({ title, children }) {
+function MiniChart({ title, hint, children }) {
+  const header = (
+    <div style={{
+      color: C.muted, fontSize: 10,
+      textTransform: 'uppercase', letterSpacing: '0.08em',
+      marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4,
+    }}>
+      {title}
+      {hint && (
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 12, height: 12, borderRadius: '50%',
+          border: `1px solid ${C.dimmer}`, color: C.dimmer,
+          fontSize: 8, lineHeight: 1, flexShrink: 0,
+        }}>?</span>
+      )}
+    </div>
+  )
   return (
     <div style={{
       background: C.card, border: `1px solid ${C.border}`,
       borderRadius: 6, padding: '14px 16px',
     }}>
-      <div style={{
-        color: C.muted, fontSize: 10,
-        textTransform: 'uppercase', letterSpacing: '0.08em',
-        marginBottom: 10,
-      }}>
-        {title}
-      </div>
+      {hint ? <HintTooltip text={hint}>{header}</HintTooltip> : header}
       <ResponsiveContainer width="100%" height={180}>
         {children}
       </ResponsiveContainer>
@@ -213,18 +266,27 @@ function MarketDetail({ ticker }) {
         </span>
       </div>
 
+      {/* Alerts */}
+      <MarketAlerts ticker={ticker} />
+
       {/* Stats */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <StatCard label="Price"        value={fmt(latest.last_price, 3)} color={C.accent} />
-        <StatCard label="Spread"       value={fmt(latest.spread, 4)}
-          color={latest.spread > SPREAD_THRESHOLD ? C.amber : C.text} />
-        <StatCard label="Imbalance"    value={fmt(latest.imbalance, 4)}
-          color={Math.abs(latest.imbalance || 0) > IMBALANCE_THRESHOLD ? C.amber : C.text} />
-        <StatCard label="Momentum"     value={fmt(latest.momentum, 4)}
-          color={latest.momentum > 0 ? C.green : latest.momentum < 0 ? C.red : C.text} />
-        <StatCard label="Liquidity"    value={fmt(latest.liquidity, 2)}
-          color={(latest.liquidity || 0) <= LIQUIDITY_THRESHOLD ? C.red : C.text} />
-        <StatCard label="Open Interest" value={fmtInt(latest.open_interest)} />
+        <StatCard label="Price" value={fmt(latest.last_price, 3)} color={C.accent}
+          hint="Last traded price in dollars. On Kalshi this represents the probability — $0.65 means the market implies a 65% chance of YES." />
+        <StatCard label="Spread" value={fmt(latest.spread, 4)}
+          color={latest.spread > SPREAD_THRESHOLD ? C.amber : C.text}
+          hint="Difference between the best ask and best bid. A tight spread means high liquidity and low transaction cost. Amber when above the alert threshold." />
+        <StatCard label="Imbalance" value={fmt(latest.imbalance, 4)}
+          color={Math.abs(latest.imbalance || 0) > IMBALANCE_THRESHOLD ? C.amber : C.text}
+          hint="Order book skew: (bid − ask) / (bid + ask). Positive means more buy-side pressure, negative means sell-side. Large values can precede price moves." />
+        <StatCard label="Momentum" value={fmt(latest.momentum, 4)}
+          color={latest.momentum > 0 ? C.green : latest.momentum < 0 ? C.red : C.text}
+          hint="Short-term price velocity — difference between recent price and its 60-second moving average. Green = upward drift, red = downward drift." />
+        <StatCard label="Liquidity" value={fmt(latest.liquidity, 2)}
+          color={(latest.liquidity || 0) <= LIQUIDITY_THRESHOLD ? C.red : C.text}
+          hint="Dollar value of open interest (contracts × price) — a proxy for market depth. Low or rapidly falling values mean capital is leaving the market, making large price moves easier to trigger." />
+        <StatCard label="Open Interest" value={fmtInt(latest.open_interest)}
+          hint="Total number of contracts currently held by market participants. Rising open interest alongside a price move confirms new money entering the position." />
       </div>
 
       {/* Charts */}
@@ -239,7 +301,7 @@ function MarketDetail({ ticker }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
-          <MiniChart title="Price">
+          <MiniChart title="Price" hint="Last traded price in dollars. On Kalshi, price ≈ probability — $0.65 means the market implies a 65% chance of YES. Bid and ask dashes show the current best quotes.">
             <LineChart data={snapshots}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -251,7 +313,7 @@ function MarketDetail({ ticker }) {
             </LineChart>
           </MiniChart>
 
-          <MiniChart title="Spread">
+          <MiniChart title="Spread" hint="Ask minus bid. A narrow spread means tight liquidity and low transaction cost. The amber threshold line marks when the spread is wide enough to trigger an alert.">
             <LineChart data={snapshots}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -263,7 +325,7 @@ function MarketDetail({ ticker }) {
             </LineChart>
           </MiniChart>
 
-          <MiniChart title="Imbalance">
+          <MiniChart title="Imbalance" hint="Order book skew: (bid − ask) / (bid + ask). Positive means more buy pressure, negative means sell pressure. Crossing the amber thresholds can signal a coming price move.">
             <LineChart data={snapshots}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -276,7 +338,7 @@ function MarketDetail({ ticker }) {
             </LineChart>
           </MiniChart>
 
-          <MiniChart title="Momentum">
+          <MiniChart title="Momentum" hint="Price change relative to 60 seconds ago. Positive means the market has drifted up recently; negative means it has drifted down. Near zero means the price is stable.">
             <LineChart data={snapshots}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -287,7 +349,7 @@ function MarketDetail({ ticker }) {
             </LineChart>
           </MiniChart>
 
-          <MiniChart title="Volume (10s)">
+          <MiniChart title="Volume (10s)" hint="Contracts traded in the last 10 seconds, computed from the cumulative Kalshi volume counter. Spikes above the red threshold line trigger a volume-spike alert.">
             <BarChart data={snapshots}>
               <CartesianGrid {...gridProps} vertical={false} />
               <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -299,7 +361,7 @@ function MarketDetail({ ticker }) {
             </BarChart>
           </MiniChart>
 
-          <MiniChart title="Liquidity">
+          <MiniChart title="Liquidity" hint="Dollar value of open interest (contracts × price) — a proxy for market depth when order book size isn't available. Falling values mean capital is leaving the market. Drops below the red line trigger a liquidity-drain alert.">
             <LineChart data={snapshots}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -311,6 +373,125 @@ function MarketDetail({ ticker }) {
             </LineChart>
           </MiniChart>
 
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Alert helpers ────────────────────────────────────────────────────────────
+const ALERT_LABELS = {
+  microprice: 'Microprice',
+  volume:     'Volume Spike',
+  imbalance:  'Imbalance',
+  spread:     'Spread',
+  liquidity:  'Liquidity',
+}
+
+const DIRECTION_COLOR = dir => {
+  if (['up', 'buy', 'tightening'].includes(dir)) return C.green
+  if (['down', 'sell', 'drain', 'widening'].includes(dir)) return C.red
+  return C.muted
+}
+
+const fmtAlertValue = (type, value) => {
+  const n = Number(value)
+  if (type === 'volume') return `${n > 0 ? '+' : ''}${Math.round(n)}`
+  return `${n > 0 ? '+' : ''}${n.toFixed(4)}`
+}
+
+const fmtAlertTime = ts => {
+  const d = new Date(Number(ts) * 1000)
+  return d.toTimeString().slice(0, 8)
+}
+
+// ─── MarketAlerts ─────────────────────────────────────────────────────────────
+function MarketAlerts({ ticker }) {
+  const [alerts, setAlerts] = useState([])
+  const [connected, setConnected] = useState(false)
+
+  useEffect(() => {
+    setAlerts([])
+    const es = new EventSource(`${API}/alerts/stream?market=${encodeURIComponent(ticker)}`)
+    es.onopen = () => setConnected(true)
+    es.onerror = () => setConnected(false)
+    es.onmessage = e => {
+      try {
+        const alert = JSON.parse(e.data)
+        setAlerts(prev => [alert, ...prev].slice(0, 50))
+      } catch {}
+    }
+    return () => es.close()
+  }, [ticker])
+
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: 6, marginBottom: 16,
+    }}>
+      <div style={{
+        padding: '10px 14px', borderBottom: `1px solid ${C.border}`,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+          textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted,
+        }}>
+          Signal Alerts
+        </span>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: connected ? C.green : C.dimmer,
+          boxShadow: connected ? `0 0 5px ${C.green}` : 'none',
+          transition: 'background 0.3s',
+        }} />
+      </div>
+
+      {alerts.length === 0 ? (
+        <div style={{
+          padding: '14px 16px',
+          color: C.dimmer, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
+        }}>
+          listening for signals...
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '10px 14px' }}>
+          {alerts.map((a, i) => {
+            const col = DIRECTION_COLOR(a.direction)
+            return (
+              <div key={a.id || i} style={{
+                background: C.surface, border: `1px solid ${col}33`,
+                borderRadius: 5, padding: '6px 10px',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                  fontWeight: 600, color: col,
+                }}>
+                  {ALERT_LABELS[a.type] || a.type}
+                </span>
+                <span style={{
+                  fontSize: 10, color: col,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  background: col + '22', padding: '1px 5px', borderRadius: 3,
+                }}>
+                  {a.direction}
+                </span>
+                <span style={{
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+                  color: col, fontWeight: 600,
+                }}>
+                  {fmtAlertValue(a.type, a.value)}
+                </span>
+                <span style={{
+                  fontSize: 10, color: C.dimmer,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                }}>
+                  {fmtAlertTime(a.ts)}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -491,6 +672,7 @@ export default function App() {
             </div>
           )
         }
+
       </div>
     </div>
   )

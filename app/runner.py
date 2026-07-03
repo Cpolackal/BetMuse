@@ -7,6 +7,7 @@ from app.workers.alert_engine import alert_engine
 from app.workers.backstop import backstop
 from app.workers.buffer_maintainer import buffer_maintainer
 from app.workers.db_writer import db_writer
+from app.workers.seeder import seed_buffers
 
 
 async def setup_stream(redis_client):
@@ -30,6 +31,7 @@ async def run_websocket_client():
     redis_client = redis.from_url(redis_url, decode_responses=True)
 
     await setup_stream(redis_client)
+    await seed_buffers(active_markets)
     try:
         await asyncio.gather(
             ws_loop(redis_client),
