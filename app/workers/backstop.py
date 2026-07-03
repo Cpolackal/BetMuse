@@ -30,7 +30,7 @@ async def backstop(active_markets: dict):
 
         db = SessionLocal()
         try:
-            to_check = get_unresolved_markets(db)
+            to_check = await asyncio.to_thread(get_unresolved_markets, db)
             if to_check:
                 logger.info("backstop: checking %d unresolved markets", len(to_check))
                 for market in to_check:
@@ -41,7 +41,7 @@ async def backstop(active_markets: dict):
                         resolved = _normalize_result(market_data.get("result"))
                         if resolved is None:
                             continue
-                        resolve_market(db, market.ticker, resolved)
+                        await asyncio.to_thread(resolve_market, db, market.ticker, resolved)
                         active_markets.pop(market.ticker, None)
                         logger.info("backstop: resolved %s → %s", market.ticker, resolved)
                     except Exception:
@@ -61,7 +61,7 @@ async def backstop(active_markets: dict):
 
         db = SessionLocal()
         try:
-            deleted = purge_snapshots(db)
+            deleted = await asyncio.to_thread(purge_snapshots, db)
             if deleted:
                 logger.info("backstop: purged %d stale snapshots", deleted)
         except Exception:
