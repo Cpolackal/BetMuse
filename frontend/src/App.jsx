@@ -166,15 +166,30 @@ function MiniChart({ title, hint, children }) {
       borderRadius: 6, padding: '14px 16px',
     }}>
       {hint ? <HintTooltip text={hint}>{header}</HintTooltip> : header}
-      <ResponsiveContainer width="100%" height={180}>
+      <ResponsiveContainer width="100%" height={320}>
         {children}
       </ResponsiveContainer>
     </div>
   )
 }
 
-const axisStyle = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, fill: C.dimmer }
+const axisStyle = { fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fill: C.dimmer }
 const gridProps = { stroke: C.border, strokeDasharray: '2 4' }
+const axisLabelStyle = { fontSize: 11, fill: C.muted, fontFamily: "'IBM Plex Mono', monospace" }
+const chartMargin = { top: 8, right: 16, bottom: 18, left: 12 }
+const xAxisProps = {
+  dataKey: '_t', tick: axisStyle, tickLine: false, axisLine: false,
+  interval: 'preserveStartEnd', minTickGap: 48,
+  label: { value: 'time', position: 'insideBottom', offset: -12, ...axisLabelStyle },
+}
+const yAxisProps = label => ({
+  tick: axisStyle, tickLine: false, axisLine: false, width: 64,
+  label: { value: label, angle: -90, position: 'insideLeft', offset: 4, ...axisLabelStyle },
+})
+const fmtCompact = v =>
+  Math.abs(v) >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
+    : Math.abs(v) >= 1_000 ? `${(v / 1_000).toFixed(0)}k`
+      : `${v}`
 
 // ─── MarketDetail ─────────────────────────────────────────────────────────────
 function MarketDetail({ ticker }) {
@@ -207,7 +222,7 @@ function MarketDetail({ ticker }) {
   }, [ticker, fetchSnaps])
 
   useEffect(() => {
-    const id = setInterval(fetchSnaps, 30_000)
+    const id = setInterval(fetchSnaps, 5_000)
     return () => clearInterval(id)
   }, [fetchSnaps])
 
@@ -223,6 +238,11 @@ function MarketDetail({ ticker }) {
   }
 
   const latest = snapshots[snapshots.length - 1] || {}
+
+  // Old snapshots can have null values for series added later (e.g. liquidity).
+  // Drop rows where a chart's series are all null so the data that does exist
+  // fills the full chart width instead of a sliver at the right edge.
+  const seriesFor = (...keys) => snapshots.filter(r => keys.some(k => r[k] != null))
 
   const resultBadge = meta?.result === true
     ? { label: 'YES',  bg: '#14532d', color: C.green }
@@ -302,10 +322,10 @@ function MarketDetail({ ticker }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
           <MiniChart title="Price" hint="Last traded price in dollars. On Kalshi, price ≈ probability — $0.65 means the market implies a 65% chance of YES. Bid and ask dashes show the current best quotes.">
-            <LineChart data={snapshots}>
+            <LineChart data={seriesFor('last_price', 'yes_bid', 'yes_ask')} margin={chartMargin}>
               <CartesianGrid {...gridProps} />
-              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(3)} />
+              <XAxis {...xAxisProps} />
+              <YAxis {...yAxisProps('price ($)')} tickFormatter={v => v.toFixed(3)} />
               <Tooltip content={<ChartTooltip />} />
               <Line type="monotone" dataKey="last_price" stroke={C.accent} dot={false} strokeWidth={1.5} name="price" />
               <Line type="monotone" dataKey="yes_bid"    stroke={C.green}  dot={false} strokeWidth={1}   name="bid"   strokeDasharray="3 2" />
@@ -314,10 +334,10 @@ function MarketDetail({ ticker }) {
           </MiniChart>
 
           <MiniChart title="Spread" hint="Ask minus bid. A narrow spread means tight liquidity and low transaction cost. The amber threshold line marks when the spread is wide enough to trigger an alert.">
-            <LineChart data={snapshots}>
+            <LineChart data={seriesFor('spread')} margin={chartMargin}>
               <CartesianGrid {...gridProps} />
-              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(3)} />
+              <XAxis {...xAxisProps} />
+              <YAxis {...yAxisProps('spread ($)')} tickFormatter={v => v.toFixed(3)} />
               <Tooltip content={<ChartTooltip />} />
               <ReferenceLine y={SPREAD_THRESHOLD} stroke={C.amber} strokeDasharray="4 3" strokeWidth={1}
                 label={{ value: 'thresh', fill: C.amber, fontSize: 9, fontFamily: 'IBM Plex Mono' }} />
@@ -326,10 +346,10 @@ function MarketDetail({ ticker }) {
           </MiniChart>
 
           <MiniChart title="Imbalance" hint="Order book skew: (bid − ask) / (bid + ask). Positive means more buy pressure, negative means sell pressure. Crossing the amber thresholds can signal a coming price move.">
-            <LineChart data={snapshots}>
+            <LineChart data={seriesFor('imbalance')} margin={chartMargin}>
               <CartesianGrid {...gridProps} />
-              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(2)} />
+              <XAxis {...xAxisProps} />
+              <YAxis {...yAxisProps('imbalance')} tickFormatter={v => v.toFixed(2)} />
               <Tooltip content={<ChartTooltip />} />
               <ReferenceLine y={0}                    stroke={C.dimmer} strokeDasharray="2 4" strokeWidth={1} />
               <ReferenceLine y={ IMBALANCE_THRESHOLD} stroke={C.amber}  strokeDasharray="4 3" strokeWidth={1} />
@@ -339,10 +359,10 @@ function MarketDetail({ ticker }) {
           </MiniChart>
 
           <MiniChart title="Momentum" hint="Price change relative to 60 seconds ago. Positive means the market has drifted up recently; negative means it has drifted down. Near zero means the price is stable.">
-            <LineChart data={snapshots}>
+            <LineChart data={seriesFor('momentum')} margin={chartMargin}>
               <CartesianGrid {...gridProps} />
-              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(3)} />
+              <XAxis {...xAxisProps} />
+              <YAxis {...yAxisProps('Δ price / 60s ($)')} tickFormatter={v => v.toFixed(3)} />
               <Tooltip content={<ChartTooltip />} />
               <ReferenceLine y={0} stroke={C.dimmer} strokeDasharray="2 4" strokeWidth={1} />
               <Line type="monotone" dataKey="momentum" stroke={C.accent} dot={false} strokeWidth={1.5} name="momentum" />
@@ -350,10 +370,10 @@ function MarketDetail({ ticker }) {
           </MiniChart>
 
           <MiniChart title="Volume (10s)" hint="Contracts traded in the last 10 seconds, computed from the cumulative Kalshi volume counter. Spikes above the red threshold line trigger a volume-spike alert.">
-            <BarChart data={snapshots}>
+            <BarChart data={seriesFor('volume_10s')} margin={chartMargin}>
               <CartesianGrid {...gridProps} vertical={false} />
-              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={40} />
+              <XAxis {...xAxisProps} />
+              <YAxis {...yAxisProps('contracts / 10s')} tickFormatter={fmtCompact} />
               <Tooltip content={<ChartTooltip />} />
               <ReferenceLine y={VOL_THRESHOLD} stroke={C.red} strokeDasharray="4 3" strokeWidth={1}
                 label={{ value: 'thresh', fill: C.red, fontSize: 9, fontFamily: 'IBM Plex Mono' }} />
@@ -362,10 +382,10 @@ function MarketDetail({ ticker }) {
           </MiniChart>
 
           <MiniChart title="Liquidity" hint="Dollar value of open interest (contracts × price) — a proxy for market depth when order book size isn't available. Falling values mean capital is leaving the market. Drops below the red line trigger a liquidity-drain alert.">
-            <LineChart data={snapshots}>
+            <LineChart data={seriesFor('liquidity')} margin={chartMargin}>
               <CartesianGrid {...gridProps} />
-              <XAxis dataKey="_t" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} tickFormatter={v => v.toFixed(1)} />
+              <XAxis {...xAxisProps} />
+              <YAxis {...yAxisProps('open interest ($)')} tickFormatter={fmtCompact} />
               <Tooltip content={<ChartTooltip />} />
               <ReferenceLine y={LIQUIDITY_THRESHOLD} stroke={C.red} strokeDasharray="4 3" strokeWidth={1}
                 label={{ value: 'drain', fill: C.red, fontSize: 9, fontFamily: 'IBM Plex Mono' }} />
@@ -562,7 +582,7 @@ export default function App() {
       </div>
 
       {/* Main */}
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '32px 24px' }}>
 
         {/* Search */}
         <div ref={wrapRef} style={{ position: 'relative', marginBottom: 28 }}>

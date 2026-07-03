@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,17 @@ async def lifespan(app: FastAPI):
     if os.getenv("KALSHI_WS_RUN", "").strip().lower() in ("1", "true", "yes"):
         from app.runner import run_websocket_client
         ws_task = asyncio.create_task(run_websocket_client())
+
+        def _on_runner_done(task: asyncio.Task):
+            if task.cancelled():
+                return
+            exc = task.exception()
+            if exc is not None:
+                logging.getLogger(__name__).critical(
+                    "kalshi runner died; workers are down", exc_info=exc
+                )
+
+        ws_task.add_done_callback(_on_runner_done)
     yield
     if ws_task and not ws_task.done():
         ws_task.cancel()

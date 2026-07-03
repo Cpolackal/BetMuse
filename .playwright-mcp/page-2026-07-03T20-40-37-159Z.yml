@@ -1,0 +1,337 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: BETMUSE
+      - generic [ref=e6]: "|"
+      - generic [ref=e7]: prediction market analytics
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - img [ref=e11]
+          - textbox "Search markets by name..." [ref=e14]: Bitcoin price on Jul 3, 2026?
+          - button "✕" [ref=e18] [cursor=pointer]
+        - generic [ref=e164]:
+          - generic [ref=e165] [cursor=pointer]:
+            - generic [ref=e166]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e167]: KXBTCD-26JUL0317-T54999.99
+          - generic [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e170]: KXBTCD-26JUL0317-T60499.99
+          - generic [ref=e171] [cursor=pointer]:
+            - generic [ref=e172]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e173]: KXBTCD-26JUL0317-T61999.99
+          - generic [ref=e174] [cursor=pointer]:
+            - generic [ref=e175]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e176]: KXBTCD-26JUL0317-T59999.99
+          - generic [ref=e177] [cursor=pointer]:
+            - generic [ref=e178]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e179]: KXBTCD-26JUL0317-T59499.99
+          - generic [ref=e180] [cursor=pointer]:
+            - generic [ref=e181]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e182]: KXBTCD-26JUL0317-T56999.99
+          - generic [ref=e183] [cursor=pointer]:
+            - generic [ref=e184]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e185]: KXBTCD-26JUL0317-T57499.99
+          - generic [ref=e186] [cursor=pointer]:
+            - generic [ref=e187]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e188]: KXBTCD-26JUL0317-T55999.99
+          - generic [ref=e189] [cursor=pointer]:
+            - generic [ref=e190]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e191]: KXBTCD-26JUL0317-T56499.99
+          - generic [ref=e192] [cursor=pointer]:
+            - generic [ref=e193]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e194]: KXBTCD-26JUL0317-T62999.99
+          - generic [ref=e195] [cursor=pointer]:
+            - generic [ref=e196]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e197]: KXBTCD-26JUL0317-T64499.99
+          - generic [ref=e198] [cursor=pointer]:
+            - generic [ref=e199]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e200]: KXBTCD-26JUL0317-T65499.99
+          - generic [ref=e201] [cursor=pointer]:
+            - generic [ref=e202]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e203]: KXBTCD-26JUL0317-T63999.99
+          - generic [ref=e204] [cursor=pointer]:
+            - generic [ref=e205]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e206]: KXBTCD-26JUL0317-T62499.99
+          - generic [ref=e207] [cursor=pointer]:
+            - generic [ref=e208]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e209]: KXBTCD-26JUL0317-T60999.99
+          - generic [ref=e210] [cursor=pointer]:
+            - generic [ref=e211]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e212]: KXBTCD-26JUL0317-T52999.99
+          - generic [ref=e213] [cursor=pointer]:
+            - generic [ref=e214]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e215]: KXBTCD-26JUL0317-T61499.99
+          - generic [ref=e216] [cursor=pointer]:
+            - generic [ref=e217]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e218]: KXBTCD-26JUL0317-T66499.99
+          - generic [ref=e219] [cursor=pointer]:
+            - generic [ref=e220]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e221]: KXBTCD-26JUL0317-T52499.99
+          - generic [ref=e222] [cursor=pointer]:
+            - generic [ref=e223]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e224]: KXBTCD-26JUL0317-T57999.99
+          - generic [ref=e225] [cursor=pointer]:
+            - generic [ref=e226]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e227]: KXBTCD-26JUL0317-T58499.99
+          - generic [ref=e228] [cursor=pointer]:
+            - generic [ref=e229]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e230]: KXBTCD-26JUL0317-T58999.99
+          - generic [ref=e231] [cursor=pointer]:
+            - generic [ref=e232]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e233]: KXBTCD-26JUL0317-T55499.99
+          - generic [ref=e234] [cursor=pointer]:
+            - generic [ref=e235]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e236]: KXBTCD-26JUL0317-T63499.99
+          - generic [ref=e237] [cursor=pointer]:
+            - generic [ref=e238]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e239]: KXBTCD-26JUL0317-T53999.99
+          - generic [ref=e240] [cursor=pointer]:
+            - generic [ref=e241]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e242]: KXBTCD-26JUL0317-T68499.99
+          - generic [ref=e243] [cursor=pointer]:
+            - generic [ref=e244]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e245]: KXBTCD-26JUL0317-T64999.99
+          - generic [ref=e246] [cursor=pointer]:
+            - generic [ref=e247]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e248]: KXBTCD-26JUL0317-T54499.99
+          - generic [ref=e249] [cursor=pointer]:
+            - generic [ref=e250]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e251]: KXBTCD-26JUL0317-T65999.99
+          - generic [ref=e252] [cursor=pointer]:
+            - generic [ref=e253]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e254]: KXBTCD-26JUL0317-T51999.99
+          - generic [ref=e255] [cursor=pointer]:
+            - generic [ref=e256]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e257]: KXBTCD-26JUL0317-T53499.99
+          - generic [ref=e258] [cursor=pointer]:
+            - generic [ref=e259]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e260]: KXBTCD-26JUL0317-T51499.99
+          - generic [ref=e261] [cursor=pointer]:
+            - generic [ref=e262]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e263]: KXBTCD-26JUL0317-T67499.99
+          - generic [ref=e264] [cursor=pointer]:
+            - generic [ref=e265]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e266]: KXBTCD-26JUL0317-T66999.99
+          - generic [ref=e267] [cursor=pointer]:
+            - generic [ref=e268]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e269]: KXBTCD-26JUL0317-T50999.99
+          - generic [ref=e270] [cursor=pointer]:
+            - generic [ref=e271]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e272]: KXBTCD-26JUL0317-T69999.99
+          - generic [ref=e273] [cursor=pointer]:
+            - generic [ref=e274]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e275]: KXBTCD-26JUL0317-T70499.99
+          - generic [ref=e276] [cursor=pointer]:
+            - generic [ref=e277]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e278]: KXBTCD-26JUL0317-T69499.99
+          - generic [ref=e279] [cursor=pointer]:
+            - generic [ref=e280]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e281]: KXBTCD-26JUL0317-T67999.99
+          - generic [ref=e282] [cursor=pointer]:
+            - generic [ref=e283]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e284]: KXBTCD-26JUL0317-T47999.99
+          - generic [ref=e285] [cursor=pointer]:
+            - generic [ref=e286]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e287]: KXBTCD-26JUL0317-T48499.99
+          - generic [ref=e288] [cursor=pointer]:
+            - generic [ref=e289]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e290]: KXBTCD-26JUL0317-T70999.99
+          - generic [ref=e291] [cursor=pointer]:
+            - generic [ref=e292]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e293]: KXBTCD-26JUL0317-T49499.99
+          - generic [ref=e294] [cursor=pointer]:
+            - generic [ref=e295]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e296]: KXBTCD-26JUL0317-T48999.99
+          - generic [ref=e297] [cursor=pointer]:
+            - generic [ref=e298]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e299]: KXBTCD-26JUL0317-T50499.99
+          - generic [ref=e300] [cursor=pointer]:
+            - generic [ref=e301]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e302]: KXBTCD-26JUL0317-T47499.99
+          - generic [ref=e303]: 46 results · only active markets shown
+      - generic [ref=e304]:
+        - generic [ref=e305]:
+          - generic [ref=e306]:
+            - generic [ref=e307]: Bitcoin price on Jul 3, 2026?
+            - generic [ref=e308]:
+              - generic [ref=e309]: KXBTCD-26JUL0317-T62499.99
+              - generic [ref=e310]: closes Jul 3, 2026
+              - generic [ref=e311]: · polled 16:40:36
+          - generic [ref=e312]: OPEN
+        - generic [ref=e313]:
+          - generic [ref=e315]: Signal Alerts
+          - generic [ref=e317]: listening for signals...
+        - generic [ref=e318]:
+          - generic [ref=e320]:
+            - generic [ref=e321]:
+              - text: Price
+              - generic [ref=e322]: "?"
+            - generic [ref=e323]: "0.790"
+          - generic [ref=e325]:
+            - generic [ref=e326]:
+              - text: Spread
+              - generic [ref=e327]: "?"
+            - generic [ref=e328]: "0.0100"
+          - generic [ref=e330]:
+            - generic [ref=e331]:
+              - text: Imbalance
+              - generic [ref=e332]: "?"
+            - generic [ref=e333]: "-0.0064"
+          - generic [ref=e335]:
+            - generic [ref=e336]:
+              - text: Momentum
+              - generic [ref=e337]: "?"
+            - generic [ref=e338]: "-0.0100"
+          - generic [ref=e340]:
+            - generic [ref=e341]:
+              - text: Liquidity
+              - generic [ref=e342]: "?"
+            - generic [ref=e343]: "403550.23"
+          - generic [ref=e345]:
+            - generic [ref=e346]:
+              - text: Open Interest
+              - generic [ref=e347]: "?"
+            - generic [ref=e348]: 510,823
+        - generic [ref=e349]:
+          - generic [ref=e350]:
+            - generic [ref=e352]:
+              - text: Price
+              - generic [ref=e353]: "?"
+            - application [ref=e356]:
+              - generic [ref=e371]:
+                - generic [ref=e372]:
+                  - generic [ref=e374]: 20:07:25
+                  - generic [ref=e376]: 20:30:38
+                  - generic [ref=e378]: 20:52:11
+                  - generic [ref=e380]: 21:26:14
+                  - generic [ref=e382]: 21:39:02
+                  - generic [ref=e384]: 21:52:55
+                  - generic [ref=e386]: 22:04:55
+                  - generic [ref=e388]: 00:26:35
+                  - generic [ref=e390]: 00:32:30
+                  - generic [ref=e392]: 20:40:19
+                - generic [ref=e393]:
+                  - generic [ref=e395]: "0.000"
+                  - generic [ref=e397]: "0.250"
+                  - generic [ref=e399]: "0.500"
+                  - generic [ref=e401]: "0.750"
+                  - generic [ref=e403]: "1.000"
+          - generic [ref=e404]:
+            - generic [ref=e406]:
+              - text: Spread
+              - generic [ref=e407]: "?"
+            - application [ref=e410]:
+              - generic [ref=e419]:
+                - generic [ref=e420]:
+                  - generic [ref=e422]: 20:07:25
+                  - generic [ref=e424]: 20:30:38
+                  - generic [ref=e426]: 20:52:11
+                  - generic [ref=e428]: 21:26:14
+                  - generic [ref=e430]: 21:39:02
+                  - generic [ref=e432]: 21:52:55
+                  - generic [ref=e434]: 22:04:55
+                  - generic [ref=e436]: 00:26:35
+                  - generic [ref=e438]: 00:32:30
+                  - generic [ref=e440]: 20:40:19
+                - generic [ref=e441]:
+                  - generic [ref=e443]: "0.000"
+                  - generic [ref=e445]: "0.015"
+                  - generic [ref=e447]: "0.030"
+                  - generic [ref=e449]: "0.045"
+                  - generic [ref=e451]: "0.060"
+                - generic [ref=e452]: thresh
+          - generic [ref=e453]:
+            - generic [ref=e455]:
+              - text: Imbalance
+              - generic [ref=e456]: "?"
+            - application [ref=e459]:
+              - generic [ref=e468]:
+                - generic [ref=e469]:
+                  - generic [ref=e471]: 20:07:25
+                  - generic [ref=e473]: 20:30:38
+                  - generic [ref=e475]: 20:52:11
+                  - generic [ref=e477]: 21:26:14
+                  - generic [ref=e479]: 21:39:02
+                  - generic [ref=e481]: 21:52:55
+                  - generic [ref=e483]: 22:04:55
+                  - generic [ref=e485]: 00:26:35
+                  - generic [ref=e487]: 00:32:30
+                  - generic [ref=e489]: 20:40:19
+                - generic [ref=e490]:
+                  - generic [ref=e492]: "-0.12"
+                  - generic [ref=e494]: "-0.09"
+                  - generic [ref=e496]: "-0.06"
+                  - generic [ref=e498]: "-0.03"
+                  - generic [ref=e500]: "0.00"
+          - generic [ref=e501]:
+            - generic [ref=e503]:
+              - text: Momentum
+              - generic [ref=e504]: "?"
+            - application [ref=e507]:
+              - generic [ref=e516]:
+                - generic [ref=e517]:
+                  - generic [ref=e519]: 20:07:25
+                  - generic [ref=e521]: 20:30:38
+                  - generic [ref=e523]: 20:52:11
+                  - generic [ref=e525]: 21:26:14
+                  - generic [ref=e527]: 21:39:02
+                  - generic [ref=e529]: 21:52:55
+                  - generic [ref=e531]: 22:04:55
+                  - generic [ref=e533]: 00:26:35
+                  - generic [ref=e535]: 00:32:30
+                  - generic [ref=e537]: 20:40:19
+                - generic [ref=e538]:
+                  - generic [ref=e540]: "-0.030"
+                  - generic [ref=e542]: "-0.015"
+                  - generic [ref=e544]: "0.000"
+                  - generic [ref=e546]: "0.015"
+                  - generic [ref=e548]: "0.030"
+          - generic [ref=e549]:
+            - generic [ref=e551]:
+              - text: Volume (10s)
+              - generic [ref=e552]: "?"
+            - application [ref=e555]:
+              - generic [ref=e581]:
+                - generic [ref=e582]:
+                  - generic [ref=e584]: 20:07:25
+                  - generic [ref=e586]: 20:30:28
+                  - generic [ref=e588]: 20:51:00
+                  - generic [ref=e590]: 21:26:14
+                  - generic [ref=e592]: 21:38:42
+                  - generic [ref=e594]: 21:51:23
+                  - generic [ref=e596]: 22:04:18
+                  - generic [ref=e598]: 00:25:44
+                  - generic [ref=e600]: 00:31:14
+                  - generic [ref=e602]: 20:40:19
+                - generic [ref=e603]:
+                  - generic [ref=e605]: "0"
+                  - generic [ref=e607]: "800"
+                  - generic [ref=e609]: "1600"
+                  - generic [ref=e611]: "2400"
+                  - generic [ref=e613]: "3200"
+                - generic [ref=e614]: thresh
+          - generic [ref=e615]:
+            - generic [ref=e617]:
+              - text: Liquidity
+              - generic [ref=e618]: "?"
+            - application [ref=e621]:
+              - generic [ref=e630]:
+                - generic [ref=e631]:
+                  - generic [ref=e633]: 20:07:25
+                  - generic [ref=e635]: 20:30:38
+                  - generic [ref=e637]: 20:52:11
+                  - generic [ref=e639]: 21:26:14
+                  - generic [ref=e641]: 21:39:02
+                  - generic [ref=e643]: 21:52:55
+                  - generic [ref=e645]: 22:04:55
+                  - generic [ref=e647]: 00:26:35
+                  - generic [ref=e649]: 00:32:30
+                  - generic [ref=e651]: 20:40:19
+                - generic [ref=e652]:
+                  - generic [ref=e654]: "0.0"
+                  - generic [ref=e656]: "150000.0"
+                  - generic [ref=e658]: "300000.0"
+                  - generic [ref=e660]: "450000.0"
+                  - generic [ref=e662]: "600000.0"
+  - generic [ref=e25]: "0.0"
