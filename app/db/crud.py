@@ -140,3 +140,8 @@ def get_snapshots(db: Session, ticker: str, limit: int = 200) -> list:
     )
     return list(reversed(rows))
 
+
+def get_all_seeded_tickers(db: Session) -> list[str]:
+    rows = db.query(MarketSnapshot.ticker).distinct().all()
+    return [r[0] for r in rows]
+

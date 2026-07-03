@@ -48,10 +48,16 @@ def compute_market_analytics(ticker: str, msg: Dict[str, Any]) -> Dict[str, Any]
     no_bid = 1.0 - ask if ask == ask else float("nan")
     no_ask = 1.0 - bid if bid == bid else float("nan")
 
-    bid_size = to_float(msg.get("bid_size_fp"))
-    ask_size = to_float(msg.get("ask_size_fp"))
+    bid_size_raw = to_float(msg.get("bid_size_fp"))
+    ask_size_raw = to_float(msg.get("ask_size_fp"))
     valid = lambda v: v == v  # NaN check
-    liquidity = (bid_size * bid) + (ask_size * ask) if all(map(valid, (bid_size, bid, ask_size, ask))) else float("nan")
+    if all(map(valid, (bid_size_raw, ask_size_raw, bid, ask))):
+        # Prefer true order book depth when available (orderbook_delta channel)
+        liquidity = (bid_size_raw * bid) + (ask_size_raw * ask)
+    else:
+        # Fallback: dollar value of open interest (ticker channel only sends this)
+        oi = to_float(msg.get("open_interest_fp"))
+        liquidity = oi * price if valid(oi) and valid(price) else None
 
     # Use cumulative volume if available; otherwise treat as 0
     cum_vol_raw = msg.get("volume_fp")

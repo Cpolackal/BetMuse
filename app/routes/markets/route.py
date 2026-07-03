@@ -1,4 +1,5 @@
 import asyncio
+import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -41,27 +42,30 @@ async def market_snapshots(
     limit: int = Query(200, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
+    def _f(v):
+        return None if v is None or (isinstance(v, float) and math.isnan(v)) else v
+
     rows = get_snapshots(db, ticker, limit)
     return {
         "ticker": ticker,
         "snapshots": [
             {
                 "snapshot_time": r.snapshot_time,
-                "last_price": r.last_price,
-                "yes_bid": r.yes_bid,
-                "yes_ask": r.yes_ask,
-                "no_bid": r.no_bid,
-                "no_ask": r.no_ask,
-                "spread": r.spread,
-                "imbalance": r.imbalance,
-                "momentum": r.momentum,
+                "last_price": _f(r.last_price),
+                "yes_bid": _f(r.yes_bid),
+                "yes_ask": _f(r.yes_ask),
+                "no_bid": _f(r.no_bid),
+                "no_ask": _f(r.no_ask),
+                "spread": _f(r.spread),
+                "imbalance": _f(r.imbalance),
+                "momentum": _f(r.momentum),
                 "volume_1s": r.volume_1s,
                 "volume_10s": r.volume_10s,
                 "volume_60s": r.volume_60s,
-                "liquidity": r.liquidity,
-                "open_interest": r.open_interest,
-                "bid_size": r.bid_size,
-                "ask_size": r.ask_size,
+                "liquidity": _f(r.liquidity),
+                "open_interest": _f(r.open_interest),
+                "bid_size": _f(r.bid_size),
+                "ask_size": _f(r.ask_size),
             }
             for r in rows
         ],

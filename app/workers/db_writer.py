@@ -3,7 +3,7 @@ import asyncio
 from app.db.crud import bulk_insert_ticks
 from app.db.session import SessionLocal
 
-SNAPSHOT_INTERVAL = 10  # seconds
+SNAPSHOT_INTERVAL = 5  # seconds
 
 
 async def db_writer(active_markets: dict):
