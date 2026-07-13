@@ -1,6 +1,7 @@
 import asyncio
 
 from app.core.contract_buffer import Tick, contract_buffer
+from app.core.market_filter import is_allowed_market
 from app.db.crud import get_all_seeded_tickers, get_snapshots
 from app.db.session import SessionLocal
 
@@ -36,6 +37,8 @@ def _load_from_db() -> dict[str, contract_buffer]:
         tickers = get_all_seeded_tickers(db)
         buffers: dict[str, contract_buffer] = {}
         for ticker in tickers:
+            if not is_allowed_market(ticker):
+                continue
             rows = get_snapshots(db, ticker, limit=SEED_LIMIT)
             if not rows:
                 continue

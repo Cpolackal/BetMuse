@@ -1,1 +1,16 @@
 [      96ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:20100
+[  518594ms] DataCloneError: Failed to execute 'measure' on 'Performance': Data cannot be cloned, out of memory.
+    at logComponentRender (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:3180:623)
+    at commitPassiveMountOnFiber (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11024:131)
+    at recursivelyTraversePassiveMountEffects (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11008:13)
+    at commitPassiveMountOnFiber (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11031:13)
+    at recursivelyTraversePassiveMountEffects (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11008:13)
+    at commitPassiveMountOnFiber (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11031:13)
+    at recursivelyTraversePassiveMountEffects (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11008:13)
+    at commitPassiveMountOnFiber (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11199:13)
+    at recursivelyTraversePassiveMountEffects (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11008:13)
+    at commitPassiveMountOnFiber (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11031:13)
+[  518600ms] Error: Should not already be working.
+    at performWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:11706:17)
+    at performWorkOnRootViaSchedulerTask (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:13503:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=7571e32c:34:50)
