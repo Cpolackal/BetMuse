@@ -1,5 +1,6 @@
 import time
 from collections import deque
+from itertools import pairwise
 from app.core.contract_buffer import Tick
 from pydantic import ValidationError
 from app.services.detectors import (
@@ -17,11 +18,20 @@ IMBALANCE_THRESHOLD = 0.1
 SPREAD_THRESHOLD = 0.01
 LIQUIDITY_THRESHOLD = -5.0
 COOLDOWN_SECONDS = 30
+# Ticks only arrive on book activity, so a tennis changeover (~90s) or set
+# break (~120s) shows up as a gap in arrival times. Normal between-point gaps
+# run up to ~25s; 45s separates scheduled pauses from live play.
+PAUSE_GAP_SECONDS = 45.0
+
+
+def window_spans_pause(arrivals: deque) -> bool:
+    return any(b - a > PAUSE_GAP_SECONDS for a, b in pairwise(arrivals))
 
 
 async def alert_engine(redis_client):
     last_alerted: dict[str, float] = {}
     windows: dict[str, deque] = {}
+    arrivals: dict[str, deque] = {}
 
     while True:
         result = await redis_client.xreadgroup(
@@ -40,8 +50,18 @@ async def alert_engine(redis_client):
 
                 window = windows.setdefault(ticked.market, deque(maxlen=MIN_TICKS))
                 window.append(ticked)
+                # Stream IDs are "<unix_ms>-<seq>": the time the tick hit the
+                # stream, which stays correct even when replaying a backlog.
+                arrival_times = arrivals.setdefault(ticked.market, deque(maxlen=MIN_TICKS))
+                arrival_times.append(float(str(msg_id).split("-")[0]) / 1000.0)
 
                 if len(window) < MIN_TICKS:
+                    await redis_client.xack("ticks", "alert_engine", msg_id)
+                    continue
+
+                # Baseline-vs-recent comparisons are meaningless across a
+                # changeover; skip until the window refills with live-play ticks.
+                if window_spans_pause(arrival_times):
                     await redis_client.xack("ticks", "alert_engine", msg_id)
                     continue
 

@@ -4,6 +4,7 @@ import math
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.market_filter import is_allowed_market
 from app.db.crud import get_market, get_snapshots, search_markets, set_market
 from app.db.session import get_db
 from app.services.market_service import fetch_markets
@@ -15,6 +16,7 @@ router = APIRouter()
 async def list_markets(limit: int = 1, cursor: str | None = None, db: Session = Depends(get_db)):
     data = await fetch_markets(cursor=cursor, limit=limit)
     markets = data.get("markets", []) if isinstance(data, dict) else []
+    markets = [m for m in markets if is_allowed_market(m.get("ticker", ""))]
     for market in markets:
         await asyncio.to_thread(set_market, db, market)
     return {"markets": markets}

@@ -29,7 +29,7 @@ Kalshi WS  ──►  ws_loop  ──►  Redis Stream "ticks"
 |---|---|---|---|
 | `ws_loop` | `app/websockets/client.py` | Continuous WS stream | Connects to Kalshi, deserializes ticker_v2 messages, computes analytics, writes `Tick` objects to Redis stream `ticks` |
 | `buffer_maintainer` | `app/workers/buffer_maintainer.py` | Redis consumer group `buffer_maintainer` | Creates/updates per-market `contract_buffer` in `active_markets`; on first-seen market, fetches metadata from Kalshi REST and upserts `market_meta` via `set_market` |
-| `alert_engine` | `app/workers/alert_engine.py` | Redis consumer group `alert_engine` | Reads ticks, runs detectors against the in-memory buffer tail, writes fired signals to Redis stream `alerts` (maxlen 10000); 30s per-market cooldown |
+| `alert_engine` | `app/workers/alert_engine.py` | Redis consumer group `alert_engine` | Reads ticks, runs detectors against the in-memory buffer tail, writes fired signals to Redis stream `alerts` (maxlen 10000); 30s per-market cooldown; suppresses all detectors while the 25-tick window straddles a >45s arrival gap (tennis changeover/set break), using stream-ID timestamps |
 | `db_writer` | `app/workers/db_writer.py` | `asyncio.sleep(10)` interval | Snapshots the latest tick from each dirty buffer to `market_snapshots` via `bulk_insert_ticks` |
 | `backstop` | `app/workers/backstop.py` | `asyncio.sleep(1800)` interval | Polls Kalshi historical API for unresolved markets past close_time, resolves them in DB, evicts resolved/stale buffers from `active_markets` |
 
@@ -82,6 +82,7 @@ REST API calls (market fetch, historical) are unauthenticated public endpoints.
 | `KALSHI_API_KEY` | Yes (WS) | Kalshi API key |
 | `KALSHI_PRIVATE_KEY_PATH` | No | Path to PEM key file (default: `keys/kalshi-socket.pem`) |
 | `KALSHI_WS_RUN` | No | Set to `1`/`true`/`yes` to start the WS client on FastAPI startup |
+| `TICKER_ALLOW_PREFIXES` | No | Comma-separated market-ticker prefixes to ingest (e.g. `KXATPMATCH` for ATP tennis). Unset = all markets. Applied in `ws_loop` (before ticks hit the Redis stream) and in the seeder. |
 
 ## Running Locally
 
