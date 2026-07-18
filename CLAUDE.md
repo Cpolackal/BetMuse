@@ -31,11 +31,14 @@ Kalshi WS  ──►  ws_loop  ──►  Redis Stream "ticks"
 | `buffer_maintainer` | `app/workers/buffer_maintainer.py` | Redis consumer group `buffer_maintainer` | Creates/updates per-market `contract_buffer` in `active_markets`; on first-seen market, fetches metadata from Kalshi REST and upserts `market_meta` via `set_market` |
 | `alert_engine` | `app/workers/alert_engine.py` | Redis consumer group `alert_engine` | Reads ticks, runs detectors against the in-memory buffer tail, writes fired signals to Redis stream `alerts` (maxlen 10000); 30s per-market cooldown; suppresses all detectors while the 25-tick window straddles a >45s arrival gap (tennis changeover/set break), using stream-ID timestamps |
 | `db_writer` | `app/workers/db_writer.py` | `asyncio.sleep(10)` interval | Snapshots the latest tick from each dirty buffer to `market_snapshots` via `bulk_insert_ticks` |
+| `score_feed` | `app/workers/score_feed.py` | `asyncio.sleep(5)` interval | Polls SofaScore live tennis feed (via `curl_cffi` browser TLS impersonation — plain HTTP clients get 403), keeps `match_states: dict[event_id, MatchState]` current, resolves market tickers to `(event_id, side)` in `market_links` by querying SofaScore's event search with both surnames from the Kalshi title (SofaScore does the name resolution), then verifying via `app/services/match_mapper.py`: both surnames must match the event's players and the ticker-embedded date must agree with the event start time (search returns historical head-to-heads); refuses ambiguous matches (returns None, retried after 60s). Mapping can resolve before a match goes live, publishes state changes to Redis stream `scores` (maxlen 10000) |
 | `backstop` | `app/workers/backstop.py` | `asyncio.sleep(1800)` interval | Polls Kalshi historical API for unresolved markets past close_time, resolves them in DB, evicts resolved/stale buffers from `active_markets` |
 
 ## Core Data Types
 
 **`Tick`** (`app/core/contract_buffer.py`) — Pydantic model, the canonical per-tick data unit. Fields: `market`, `price`, `bid`, `ask`, `spread`, `volume_1s/10s/60s`, `imbalance`, `momentum`, `last_trade_ts`, and optional `no_bid/ask`, `liquidity`, `open_interest`, `dollar_volume/open_interest`, `bid_size`, `ask_size`, `last_trade_size`.
+
+**`MatchState`** (`app/core/match_state.py`) — Pydantic model of a live tennis match from the score feed: `home/away` names, `set_games` per set, current-game `points`, derived `serving` (1=home, 2=away, from game parity + `firstToServe`), `tiebreak`, `best_of`, `status`. Keyed by SofaScore event id in `match_states`.
 
 **`contract_buffer`** (`app/core/contract_buffer.py`) — Rolling deque (maxlen=600 ticks) per market. Tracks `last_seen` (monotonic) and `last_written` to drive the db_writer dirty check. `tail(n)` returns the last n ticks as a list.
 
