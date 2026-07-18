@@ -1,5 +1,7 @@
 import asyncio
+import logging
 import os
+import time
 
 import redis.asyncio as redis
 from app.websockets.client import ws_loop
@@ -8,6 +10,30 @@ from app.workers.backstop import backstop
 from app.workers.buffer_maintainer import buffer_maintainer
 from app.workers.db_writer import db_writer
 from app.workers.seeder import seed_buffers
+
+logger = logging.getLogger(__name__)
+
+RESTART_BACKOFF_INITIAL = 1.0
+RESTART_BACKOFF_MAX = 60.0
+STABLE_RUN_SECONDS = 300  # a run this long resets the backoff
+
+
+async def supervise(name: str, factory):
+    """Run a worker coroutine forever, restarting it with backoff if it dies."""
+    backoff = RESTART_BACKOFF_INITIAL
+    while True:
+        started = time.monotonic()
+        try:
+            await factory()
+            logger.error("worker %s exited unexpectedly; restarting", name)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("worker %s crashed; restarting in %.0fs", name, backoff)
+        if time.monotonic() - started > STABLE_RUN_SECONDS:
+            backoff = RESTART_BACKOFF_INITIAL
+        await asyncio.sleep(backoff)
+        backoff = min(backoff * 2, RESTART_BACKOFF_MAX)
 
 
 async def setup_stream(redis_client):
@@ -34,11 +60,11 @@ async def run_websocket_client():
     await seed_buffers(active_markets)
     try:
         await asyncio.gather(
-            ws_loop(redis_client),
-            buffer_maintainer(redis_client, active_markets),
-            alert_engine(redis_client),
-            db_writer(active_markets),
-            backstop(active_markets),
+            supervise("ws_loop", lambda: ws_loop(redis_client)),
+            supervise("buffer_maintainer", lambda: buffer_maintainer(redis_client, active_markets)),
+            supervise("alert_engine", lambda: alert_engine(redis_client)),
+            supervise("db_writer", lambda: db_writer(active_markets)),
+            supervise("backstop", lambda: backstop(active_markets)),
         )
     finally:
         await redis_client.aclose()

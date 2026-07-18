@@ -3,6 +3,7 @@ from typing import Dict, Any
 
 import websockets
 from app.core.contract_buffer import Tick
+from app.core.market_filter import is_allowed_market
 from app.services.market_analytics import compute_market_analytics
 from app.services.kalshi_auth_service import build_websocket_auth_headers
 
@@ -33,6 +34,9 @@ async def process_message(message: str, redis_client) -> Dict[str, Any] | None:
     ticker = msg.get("market_ticker")
     if not ticker:
         return data
+
+    if not is_allowed_market(ticker):
+        return None
 
     analytics = compute_market_analytics(ticker, msg)
 
