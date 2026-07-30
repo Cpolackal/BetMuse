@@ -10,6 +10,7 @@ from app.services.detectors import (
     spread_compression,
     liquidity_drain,
 )
+from app.services.tennis_model import calibrate_serve_points, match_win_probability
 
 MIN_TICKS = 25
 DELTA_THRESHOLD = 0.02
@@ -22,16 +23,27 @@ COOLDOWN_SECONDS = 30
 # break (~120s) shows up as a gap in arrival times. Normal between-point gaps
 # run up to ~25s; 45s separates scheduled pauses from live play.
 PAUSE_GAP_SECONDS = 45.0
+# Model divergence must clear this edge for this many consecutive ticks.
+MODEL_EDGE_THRESHOLD = 0.04
+MODEL_EDGE_PERSIST = 5
 
 
 def window_spans_pause(arrivals: deque) -> bool:
     return any(b - a > PAUSE_GAP_SECONDS for a, b in pairwise(arrivals))
 
 
-async def alert_engine(redis_client):
+def _mid_price(tick: Tick) -> float | None:
+    if tick.bid > 0 and tick.ask > 0:
+        return (tick.bid + tick.ask) / 2
+    return tick.price if tick.price > 0 else None
+
+
+async def alert_engine(redis_client, match_states=None, market_links=None):
     last_alerted: dict[str, float] = {}
     windows: dict[str, deque] = {}
     arrivals: dict[str, deque] = {}
+    calibrations: dict[int, tuple[float, float]] = {}
+    edge_streaks: dict[str, int] = {}
 
     while True:
         result = await redis_client.xreadgroup(
@@ -121,6 +133,40 @@ async def alert_engine(redis_client):
                         "direction": "drain", "value": str(drain), "ts": str(time.time()),
                     }, maxlen = 10000)
                     fired = True
+
+                if match_states is not None and market_links is not None:
+                    link = market_links.get(ticked.market)
+                    state = match_states.get(link[0]) if link else None
+                    if state is not None and state.status == "inprogress" and state.serving in (1, 2):
+                        event_id, side = link
+                        mid = _mid_price(ticked)
+                        if mid is not None and 0.02 < mid < 0.98:
+                            home_target = mid if side == 1 else 1 - mid
+                            params = calibrations.get(event_id)
+                            if params is None:
+                                params = calibrate_serve_points(state, home_target)
+                                if params:
+                                    calibrations[event_id] = params
+                                    print(f"[ALERT-ENGINE] calibrated {ticked.market} pa={params[0]:.3f} pb={params[1]:.3f} at {mid:.2f}")
+                            else:
+                                p_home = match_win_probability(state, *params)
+                                if p_home is not None:
+                                    model_p = p_home if side == 1 else 1 - p_home
+                                    edge = mid - model_p
+                                    if abs(edge) >= MODEL_EDGE_THRESHOLD:
+                                        edge_streaks[ticked.market] = edge_streaks.get(ticked.market, 0) + 1
+                                    else:
+                                        edge_streaks[ticked.market] = 0
+                                    if edge_streaks[ticked.market] >= MODEL_EDGE_PERSIST:
+                                        direction = "rich" if edge > 0 else "cheap"
+                                        print(f"[ALERT] {ticked.market} model divergence {direction} edge={edge:+.3f} (market {mid:.2f} vs model {model_p:.2f})")
+                                        await redis_client.xadd("alerts", {
+                                            "market": ticked.market, "type": "model_divergence",
+                                            "direction": direction, "value": str(edge), "ts": str(time.time()),
+                                            "model_price": str(round(model_p, 4)), "market_price": str(round(mid, 4)),
+                                        }, maxlen=10000)
+                                        edge_streaks[ticked.market] = 0
+                                        fired = True
 
                 if fired:
                     last_alerted[ticked.market] = now
