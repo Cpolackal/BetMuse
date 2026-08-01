@@ -26,6 +26,10 @@ PAUSE_GAP_SECONDS = 45.0
 # Model divergence must clear this edge for this many consecutive ticks.
 MODEL_EDGE_THRESHOLD = 0.04
 MODEL_EDGE_PERSIST = 5
+# Beta-Binomial pseudo-count: how many "virtual" points the calibrated prior
+# is worth against real in-play serve points. At 0 real points the model
+# uses the prior outright; by ~1-2 games of serve data it's mostly observed.
+SERVE_PRIOR_WEIGHT = 100
 
 
 def window_spans_pause(arrivals: deque) -> bool:
@@ -36,6 +40,16 @@ def _mid_price(tick: Tick) -> float | None:
     if tick.bid > 0 and tick.ask > 0:
         return (tick.bid + tick.ask) / 2
     return tick.price if tick.price > 0 else None
+
+
+def _posterior_serve_points(state, pa_cal: float, pb_cal: float) -> tuple[float, float]:
+    """Blend the once-per-match calibrated prior with this match's own
+    in-play serve points (Beta-Binomial posterior mean)."""
+    won_h, won_a = state.serve_won
+    played_h, played_a = state.serve_played
+    pa = (SERVE_PRIOR_WEIGHT * pa_cal + won_h) / (SERVE_PRIOR_WEIGHT + played_h)
+    pb = (SERVE_PRIOR_WEIGHT * pb_cal + won_a) / (SERVE_PRIOR_WEIGHT + played_a)
+    return pa, pb
 
 
 async def alert_engine(redis_client, match_states=None, market_links=None, model_prices=None):
@@ -149,14 +163,15 @@ async def alert_engine(redis_client, match_states=None, market_links=None, model
                                     calibrations[event_id] = params
                                     print(f"[ALERT-ENGINE] calibrated {ticked.market} pa={params[0]:.3f} pb={params[1]:.3f} at {mid:.2f}")
                             else:
-                                p_home = match_win_probability(state, *params)
+                                pa_live, pb_live = _posterior_serve_points(state, *params)
+                                p_home = match_win_probability(state, pa_live, pb_live)
                                 if p_home is not None:
                                     model_p = p_home if side == 1 else 1 - p_home
                                     edge = mid - model_p
                                     if model_prices is not None:
                                         model_prices[ticked.market] = {
                                             "model_price": model_p, "market_price": mid,
-                                            "edge": edge, "pa": params[0], "pb": params[1],
+                                            "edge": edge, "pa": pa_live, "pb": pb_live,
                                             "ts": time.time(),
                                         }
                                     if abs(edge) >= MODEL_EDGE_THRESHOLD:

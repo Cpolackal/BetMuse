@@ -19,6 +19,11 @@ class MatchState(BaseModel):
     tiebreak: bool = False
     start_ts: int = 0
     updated_at: float = 0.0
+    # In-play serve stats, carried forward across polls by score_feed's point
+    # diffing. Index 0 = home serving, 1 = away serving. Tiebreak points are
+    # out of scope (see score_feed._diff_game_point) and never counted here.
+    serve_played: tuple[int, int] = (0, 0)
+    serve_won: tuple[int, int] = (0, 0)
 
     def games_completed(self) -> int:
         return sum(h + a for h, a in self.set_games)
