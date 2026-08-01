@@ -38,6 +38,29 @@ class market_snapshots(Base):
     volume_1s = Column(Integer)
     volume_10s = Column(Integer)
     volume_60s = Column(Integer)
+    model_price = Column(Float, nullable=True)
+    score_state = Column(String, nullable=True)
 
 
 Index("ix_snapshots_ticker_time", market_snapshots.ticker, market_snapshots.snapshot_time)
+
+
+class match_events(Base):
+    __tablename__ = "match_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, index=True)
+    ts = Column(DateTime, index=True)
+    state_json = Column(String)
+
+
+class market_links(Base):
+    __tablename__ = "market_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticker = Column(String, unique=True, index=True)
+    event_id = Column(Integer, index=True)
+    side = Column(Integer)
+    home = Column(String)
+    away = Column(String)
+    linked_at = Column(DateTime)
