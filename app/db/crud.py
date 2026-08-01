@@ -1,7 +1,12 @@
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
-from app.db.models.market import market_meta as MarketMeta, market_snapshots as MarketSnapshot
+from app.db.models.market import (
+    market_meta as MarketMeta,
+    market_snapshots as MarketSnapshot,
+    match_events as MatchEvent,
+    market_links as MarketLink,
+)
 from app.core.contract_buffer import Tick
 
 
@@ -71,7 +76,14 @@ def resolve_market(db: Session, ticker: str, result: bool) -> bool:
     return True
 
 
-def bulk_insert_ticks(db: Session, ticks: list[Tick]):
+def bulk_insert_ticks(
+    db: Session,
+    ticks: list[Tick],
+    model_by_ticker: dict[str, float] | None = None,
+    score_by_ticker: dict[str, str] | None = None,
+):
+    model_by_ticker = model_by_ticker or {}
+    score_by_ticker = score_by_ticker or {}
     now = datetime.now(timezone.utc)
     db.add_all([
         MarketSnapshot(
@@ -94,10 +106,37 @@ def bulk_insert_ticks(db: Session, ticks: list[Tick]):
             volume_1s=tick.volume_1s,
             volume_10s=tick.volume_10s,
             volume_60s=tick.volume_60s,
+            model_price=model_by_ticker.get(tick.market),
+            score_state=score_by_ticker.get(tick.market),
         )
         for tick in ticks
     ])
     db.commit()
+
+
+def insert_match_event(db: Session, event_id: int, ts: datetime, state_json: str):
+    db.add(MatchEvent(event_id=event_id, ts=ts, state_json=state_json))
+    db.commit()
+
+
+def upsert_market_link(db: Session, ticker: str, event_id: int, side: int, home: str, away: str):
+    link = db.query(MarketLink).filter(MarketLink.ticker == ticker).first()
+    now = datetime.now(timezone.utc)
+    if link:
+        link.event_id = event_id
+        link.side = side
+        link.home = home
+        link.away = away
+        link.linked_at = now
+    else:
+        db.add(MarketLink(
+            ticker=ticker, event_id=event_id, side=side, home=home, away=away, linked_at=now,
+        ))
+    db.commit()
+
+
+def get_all_market_links(db: Session) -> list:
+    return db.query(MarketLink).all()
 
 
 def search_markets(db: Session, q: str) -> list:
