@@ -4,6 +4,7 @@ import math
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.live_state import market_links, match_states, model_prices
 from app.core.market_filter import is_allowed_market
 from app.db.crud import get_market, get_snapshots, search_markets, set_market
 from app.db.session import get_db
@@ -68,9 +69,38 @@ async def market_snapshots(
                 "open_interest": _f(r.open_interest),
                 "bid_size": _f(r.bid_size),
                 "ask_size": _f(r.ask_size),
+                "model_price": _f(r.model_price),
             }
             for r in rows
         ],
+    }
+
+
+@router.get("/{ticker}/score")
+async def market_score(ticker: str):
+    link = market_links.get(ticker)
+    state = match_states.get(link[0]) if link else None
+    if link is None or state is None:
+        return {"mapped": False}
+
+    event_id, side = link
+    model = model_prices.get(ticker)
+    return {
+        "mapped": True,
+        "event_id": event_id,
+        "side": side,
+        "home": state.home,
+        "away": state.away,
+        "tournament": state.tournament,
+        "status": state.status,
+        "best_of": state.best_of,
+        "set_games": state.set_games,
+        "points": state.points,
+        "serving": state.serving,
+        "tiebreak": state.tiebreak,
+        "model_price": model.get("model_price") if model else None,
+        "market_price": model.get("market_price") if model else None,
+        "edge": model.get("edge") if model else None,
     }
 
 

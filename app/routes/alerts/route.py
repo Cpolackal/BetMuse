@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 def _parse_entry(msg_id: str, fields: dict) -> dict:
-    return {
+    entry = {
         "id": msg_id,
         "market": fields.get("market", ""),
         "type": fields.get("type", ""),
@@ -18,6 +18,13 @@ def _parse_entry(msg_id: str, fields: dict) -> dict:
         "value": float(fields.get("value", 0)),
         "ts": float(fields.get("ts", 0)),
     }
+    # model_divergence alerts carry these extra fields (see alert_engine.py);
+    # absent on every other alert type.
+    if "model_price" in fields:
+        entry["model_price"] = float(fields["model_price"])
+    if "market_price" in fields:
+        entry["market_price"] = float(fields["market_price"])
+    return entry
 
 
 async def _stream_generator(market: str | None):
