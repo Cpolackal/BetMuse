@@ -4,11 +4,13 @@ import os
 import time
 
 import redis.asyncio as redis
+from app.core.live_state import market_links, match_states, model_prices
 from app.websockets.client import ws_loop
 from app.workers.alert_engine import alert_engine
 from app.workers.backstop import backstop
 from app.workers.buffer_maintainer import buffer_maintainer
 from app.workers.db_writer import db_writer
+from app.workers.score_feed import score_feed
 from app.workers.seeder import seed_buffers
 
 logger = logging.getLogger(__name__)
@@ -62,9 +64,10 @@ async def run_websocket_client():
         await asyncio.gather(
             supervise("ws_loop", lambda: ws_loop(redis_client)),
             supervise("buffer_maintainer", lambda: buffer_maintainer(redis_client, active_markets)),
-            supervise("alert_engine", lambda: alert_engine(redis_client)),
+            supervise("alert_engine", lambda: alert_engine(redis_client, match_states, market_links, model_prices)),
             supervise("db_writer", lambda: db_writer(active_markets)),
             supervise("backstop", lambda: backstop(active_markets)),
+            supervise("score_feed", lambda: score_feed(redis_client, active_markets, match_states, market_links)),
         )
     finally:
         await redis_client.aclose()

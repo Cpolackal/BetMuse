@@ -29,13 +29,16 @@ Kalshi WS  ──►  ws_loop  ──►  Redis Stream "ticks"
 |---|---|---|---|
 | `ws_loop` | `app/websockets/client.py` | Continuous WS stream | Connects to Kalshi, deserializes ticker_v2 messages, computes analytics, writes `Tick` objects to Redis stream `ticks` |
 | `buffer_maintainer` | `app/workers/buffer_maintainer.py` | Redis consumer group `buffer_maintainer` | Creates/updates per-market `contract_buffer` in `active_markets`; on first-seen market, fetches metadata from Kalshi REST and upserts `market_meta` via `set_market` |
-| `alert_engine` | `app/workers/alert_engine.py` | Redis consumer group `alert_engine` | Reads ticks, runs detectors against the in-memory buffer tail, writes fired signals to Redis stream `alerts` (maxlen 10000); 30s per-market cooldown; suppresses all detectors while the 25-tick window straddles a >45s arrival gap (tennis changeover/set break), using stream-ID timestamps |
+| `alert_engine` | `app/workers/alert_engine.py` | Redis consumer group `alert_engine` | Reads ticks, runs detectors against the in-memory buffer tail, writes fired signals to Redis stream `alerts` (maxlen 10000); 30s per-market cooldown; suppresses all detectors while the 25-tick window straddles a >45s arrival gap (tennis changeover/set break), using stream-ID timestamps. Joins ticks to `match_states` via `market_links` for the `model_divergence` detector |
 | `db_writer` | `app/workers/db_writer.py` | `asyncio.sleep(10)` interval | Snapshots the latest tick from each dirty buffer to `market_snapshots` via `bulk_insert_ticks` |
+| `score_feed` | `app/workers/score_feed.py` | `asyncio.sleep(5)` interval | Polls SofaScore live tennis feed (via `curl_cffi` browser TLS impersonation — plain HTTP clients get 403), keeps `match_states: dict[event_id, MatchState]` current, resolves market tickers to `(event_id, side)` in `market_links` by querying SofaScore's event search with both surnames from the Kalshi title (SofaScore does the name resolution), then verifying via `app/services/match_mapper.py`: both surnames must match the event's players and the ticker-embedded date must agree with the event start time (search returns historical head-to-heads); refuses ambiguous matches (returns None, retried after 60s). Mapping can resolve before a match goes live, publishes state changes to Redis stream `scores` (maxlen 10000) |
 | `backstop` | `app/workers/backstop.py` | `asyncio.sleep(1800)` interval | Polls Kalshi historical API for unresolved markets past close_time, resolves them in DB, evicts resolved/stale buffers from `active_markets` |
 
 ## Core Data Types
 
 **`Tick`** (`app/core/contract_buffer.py`) — Pydantic model, the canonical per-tick data unit. Fields: `market`, `price`, `bid`, `ask`, `spread`, `volume_1s/10s/60s`, `imbalance`, `momentum`, `last_trade_ts`, and optional `no_bid/ask`, `liquidity`, `open_interest`, `dollar_volume/open_interest`, `bid_size`, `ask_size`, `last_trade_size`.
+
+**`MatchState`** (`app/core/match_state.py`) — Pydantic model of a live tennis match from the score feed: `home/away` names, `set_games` per set, current-game `points`, derived `serving` (1=home, 2=away, from game parity + `firstToServe`), `tiebreak`, `best_of`, `status`. Keyed by SofaScore event id in `match_states`.
 
 **`contract_buffer`** (`app/core/contract_buffer.py`) — Rolling deque (maxlen=600 ticks) per market. Tracks `last_seen` (monotonic) and `last_written` to drive the db_writer dirty check. `tail(n)` returns the last n ticks as a list.
 
@@ -50,6 +53,8 @@ All detectors take a `window: list[Tick]` (typically the last 25 ticks). Each co
 | `imbalance_shift` | `(bid-ask)/(bid+ask)` delta | ±0.1 |
 | `spread_compression` | `spread` delta | ±0.01 |
 | `liquidity_drain` | `liquidity` delta | ≤ -5.0 |
+
+**`model_divergence`** (in `alert_engine`, not `detectors.py`): for markets with a score-feed link, compares market mid to the closed-form tennis win probability (`app/services/tennis_model.py`, O'Malley recursion over game/tiebreak/set/match from `MatchState`). Serve-point params `(pa, pb)` are calibrated once per match by bisecting the skew around 0.645 until the model matches the market's price at the first eligible tick (bakes in any market error at that instant). Fires when |mid − model| ≥ 0.04 for 5 consecutive ticks; payload adds `model_price`/`market_price` fields.
 
 Alert payloads go to Redis stream `alerts` with fields: `market`, `type`, `direction`, `value`, `ts`.
 
