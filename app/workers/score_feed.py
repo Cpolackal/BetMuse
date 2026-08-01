@@ -1,8 +1,9 @@
 import asyncio
 import time
+from datetime import datetime, timezone
 
 from app.core.match_state import MatchState
-from app.db.crud import get_market
+from app.db.crud import get_all_market_links, get_market, insert_match_event, upsert_market_link
 from app.db.session import SessionLocal
 from app.services.match_mapper import parse_title, select_event
 from app.services.score_provider import ScoreProvider, SofaScoreProvider
@@ -16,6 +17,37 @@ def _fetch_title(ticker: str) -> str | None:
     try:
         market = get_market(db, ticker)
         return market.title if market else None
+    finally:
+        db.close()
+
+
+def _insert_match_event(event_id: int, state: MatchState) -> None:
+    db = SessionLocal()
+    try:
+        insert_match_event(db, event_id, datetime.now(timezone.utc), state.compact_json())
+    finally:
+        db.close()
+
+
+def _upsert_link(ticker: str, event_id: int, side: int, home: str, away: str) -> None:
+    db = SessionLocal()
+    try:
+        upsert_market_link(db, ticker, event_id, side, home, away)
+    finally:
+        db.close()
+
+
+def _preload_links(tickers: set[str]) -> dict[str, tuple[int, int]]:
+    """Restore ticker->(event_id, side) links persisted by prior runs, scoped
+    to markets that are still active — a link for a market that's since
+    closed would just be dead weight."""
+    db = SessionLocal()
+    try:
+        return {
+            row.ticker: (row.event_id, row.side)
+            for row in get_all_market_links(db)
+            if row.ticker in tickers
+        }
     finally:
         db.close()
 
@@ -38,6 +70,12 @@ async def score_feed(
     last_published: dict[int, tuple] = {}
     was_live: set[int] = set()
 
+    preloaded = await asyncio.to_thread(_preload_links, set(active_markets))
+    for ticker, link in preloaded.items():
+        market_links.setdefault(ticker, link)
+    if preloaded:
+        print(f"[score_feed] preloaded {len(preloaded)} market link(s) from db")
+
     while True:
         try:
             live = await provider.fetch_live()
@@ -59,6 +97,7 @@ async def score_feed(
                     {"event_id": str(state.event_id), "state": state.model_dump_json()},
                     maxlen=10000,
                 )
+                await asyncio.to_thread(_insert_match_event, state.event_id, state)
 
         # A match that leaves the live feed is finished (or feed-dropped);
         # evict so stale scores are never joined against fresh ticks. Links
@@ -92,6 +131,10 @@ async def score_feed(
             link = select_event(parsed, candidates, ticker=ticker)
             if link:
                 market_links[ticker] = link
+                event_id, side = link
+                matched = next((c for c in candidates if c.event_id == event_id), None)
+                home, away = (matched.home, matched.away) if matched else ("", "")
+                await asyncio.to_thread(_upsert_link, ticker, event_id, side, home, away)
                 print(f"[score_feed] mapped {ticker} -> event {link[0]} (side {link[1]})")
 
         await asyncio.sleep(POLL_SECONDS)
