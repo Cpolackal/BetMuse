@@ -1,3 +1,5 @@
+import json
+
 from pydantic import BaseModel
 
 
@@ -20,3 +22,14 @@ class MatchState(BaseModel):
 
     def games_completed(self) -> int:
         return sum(h + a for h, a in self.set_games)
+
+    def compact_json(self) -> str:
+        """Small score-only snapshot for market_snapshots.score_state — the
+        full model_dump_json() carries names/tournament, redundant per row."""
+        return json.dumps({
+            "set_games": self.set_games,
+            "points": list(self.points),
+            "serving": self.serving,
+            "tiebreak": self.tiebreak,
+            "status": self.status,
+        })
