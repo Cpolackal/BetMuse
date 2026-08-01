@@ -4,6 +4,7 @@ import os
 import time
 
 import redis.asyncio as redis
+from app.core.live_state import market_links, match_states, model_prices
 from app.websockets.client import ws_loop
 from app.workers.alert_engine import alert_engine
 from app.workers.backstop import backstop
@@ -52,8 +53,6 @@ async def setup_stream(redis_client):
 
 async def run_websocket_client():
     active_markets = {}
-    match_states = {}
-    market_links = {}
     redis_url = os.getenv("REDIS_URL")
     if not redis_url:
         raise RuntimeError("REDIS_URL is not set")
@@ -65,7 +64,7 @@ async def run_websocket_client():
         await asyncio.gather(
             supervise("ws_loop", lambda: ws_loop(redis_client)),
             supervise("buffer_maintainer", lambda: buffer_maintainer(redis_client, active_markets)),
-            supervise("alert_engine", lambda: alert_engine(redis_client, match_states, market_links)),
+            supervise("alert_engine", lambda: alert_engine(redis_client, match_states, market_links, model_prices)),
             supervise("db_writer", lambda: db_writer(active_markets)),
             supervise("backstop", lambda: backstop(active_markets)),
             supervise("score_feed", lambda: score_feed(redis_client, active_markets, match_states, market_links)),

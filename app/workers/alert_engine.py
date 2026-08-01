@@ -38,7 +38,7 @@ def _mid_price(tick: Tick) -> float | None:
     return tick.price if tick.price > 0 else None
 
 
-async def alert_engine(redis_client, match_states=None, market_links=None):
+async def alert_engine(redis_client, match_states=None, market_links=None, model_prices=None):
     last_alerted: dict[str, float] = {}
     windows: dict[str, deque] = {}
     arrivals: dict[str, deque] = {}
@@ -153,6 +153,12 @@ async def alert_engine(redis_client, match_states=None, market_links=None):
                                 if p_home is not None:
                                     model_p = p_home if side == 1 else 1 - p_home
                                     edge = mid - model_p
+                                    if model_prices is not None:
+                                        model_prices[ticked.market] = {
+                                            "model_price": model_p, "market_price": mid,
+                                            "edge": edge, "pa": params[0], "pb": params[1],
+                                            "ts": time.time(),
+                                        }
                                     if abs(edge) >= MODEL_EDGE_THRESHOLD:
                                         edge_streaks[ticked.market] = edge_streaks.get(ticked.market, 0) + 1
                                     else:
