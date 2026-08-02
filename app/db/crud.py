@@ -185,10 +185,24 @@ def get_all_market_links(db: Session) -> list:
 
 
 def search_markets(db: Session, q: str) -> list:
+    """Resolved markets are kept until purge_resolved_markets removes them
+    (~1 day post-resolution), so they're fine to surface as-is. Unresolved
+    ones are excluded once their open_time is more than a day in the past —
+    without this, a market backstop hasn't gotten to yet (or, historically,
+    the close_time-gating bug — see get_unresolved_markets) would keep
+    surfacing in search for as long as it sat unresolved, which was
+    observed to be up to ~2 weeks."""
+    from sqlalchemy import or_
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     return (
         db.query(MarketMeta)
         .filter(MarketMeta.title.ilike(f"%{q}%"))
-        .order_by(MarketMeta.close_time.desc())
+        .filter(or_(
+            MarketMeta.result.isnot(None),
+            MarketMeta.open_time.is_(None),
+            MarketMeta.open_time > cutoff,
+        ))
+        .order_by(MarketMeta.open_time.desc())
         .limit(50)
         .all()
     )
