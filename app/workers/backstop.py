@@ -4,7 +4,7 @@ import time
 
 from app.db.crud import get_unresolved_markets, purge_resolved_markets, purge_snapshots, resolve_market
 from app.db.session import SessionLocal
-from app.services.market_service import fetch_closed_market
+from app.services.market_service import fetch_market
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ async def backstop(active_markets: dict):
                 logger.info("backstop: checking %d unresolved markets", len(to_check))
                 for market in to_check:
                     try:
-                        market_data = await fetch_closed_market(market.ticker)
+                        market_data = await fetch_market(market.ticker)
                         if not market_data:
                             continue
                         resolved = _normalize_result(market_data.get("result"))

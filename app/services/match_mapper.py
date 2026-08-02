@@ -53,7 +53,10 @@ def parse_title(title: str) -> ParsedTitle | None:
     return ParsedTitle(mine, theirs, f"{_ascii(surname_a)} {_ascii(surname_b)}")
 
 
-def _ticker_date(ticker: str) -> datetime | None:
+def ticker_date(ticker: str) -> datetime | None:
+    """The actual scheduled match date embedded in the ticker. Kalshi's own
+    market_meta.open_time is when trading opens — often the day before the
+    match — so it's the wrong field to show as "the match date"."""
     m = _TICKER_DATE_RE.search(ticker)
     if not m:
         return None
@@ -77,7 +80,7 @@ def select_event(
     count. Returns None on any ambiguity — an unmapped market just retries
     later, while a wrongly mapped one silently poisons downstream edge
     computation."""
-    market_date = _ticker_date(ticker)
+    market_date = ticker_date(ticker)
 
     matched: list[tuple[int, int]] = []
     for match in candidates:

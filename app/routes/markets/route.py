@@ -16,7 +16,7 @@ from app.db.crud import (
 )
 from app.db.session import get_db
 from app.services.market_service import fetch_markets
-from app.services.match_mapper import player_full_name
+from app.services.match_mapper import player_full_name, ticker_date
 
 router = APIRouter()
 
@@ -58,7 +58,15 @@ async def upcoming_matches(limit: int = Query(20, ge=1, le=50), db: Session = De
         key = m.event_ticker
         ev = events.get(key)
         if ev is None:
-            ev = {"event_ticker": key, "open_time": m.open_time, "close_time": m.close_time, "players": []}
+            ev = {
+                "event_ticker": key,
+                # The actual scheduled match date, not open_time (when
+                # trading opens — often the day before the match).
+                "match_date": ticker_date(m.ticker),
+                "open_time": m.open_time,
+                "close_time": m.close_time,
+                "players": [],
+            }
             events[key] = ev
             order.append(key)
         ev["players"].append({

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 from app.db.models.market import (
@@ -19,15 +19,23 @@ def latest_snapshot(db: Session, ticker: str):
     )
 
 def get_upcoming_markets(db: Session, limit: int = 60) -> list:
-    """Unresolved markets whose close_time is still in the future — i.e.
-    genuinely upcoming or currently live, not just awaiting backstop
-    resolution after close."""
+    """Markets for matches that haven't concluded: not yet started, or
+    started recently enough to plausibly still be in progress.
+
+    close_time is Kalshi's outer trading-window deadline (often ~2 weeks
+    out for tennis) — not a signal the match itself is over — so it can't
+    be used to exclude finished matches. open_time tracks the actual
+    scheduled start far more closely; the 8h cutoff is generous enough to
+    cover a slow best-of-5 without holding on to long-finished matches
+    that are simply awaiting Kalshi's own resolution lag (see
+    get_unresolved_markets)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=8)
     return (
         db.query(MarketMeta)
         .filter(MarketMeta.result.is_(None))
         .filter(MarketMeta.event_ticker.isnot(None))
-        .filter(MarketMeta.close_time.isnot(None))
-        .filter(MarketMeta.close_time > datetime.now(timezone.utc))
+        .filter(MarketMeta.open_time.isnot(None))
+        .filter(MarketMeta.open_time > cutoff)
         .order_by(MarketMeta.open_time.asc())
         .limit(limit)
         .all()
@@ -48,12 +56,20 @@ def get_latest_prices(db: Session, tickers: list[str]) -> dict[str, float]:
 
 
 def get_unresolved_markets(db: Session):
-    from datetime import datetime, timezone
+    """Markets backstop should check against Kalshi's historical API for a
+    result. Gated on open_time, not close_time: close_time is Kalshi's
+    outer trading-window deadline (often ~2 weeks past the match), so
+    gating on it means a match that finished hours ago wouldn't even be
+    checked until close_time arrives — result stays NULL indefinitely, and
+    the match keeps showing up as "upcoming" (see get_upcoming_markets).
+    3h covers a slow best-of-5; a still-in-progress match's fetch just
+    comes back empty and gets retried next cycle."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=3)
     return (
         db.query(MarketMeta)
         .filter(MarketMeta.result.is_(None))
-        .filter(MarketMeta.close_time.isnot(None))
-        .filter(MarketMeta.close_time < datetime.now(timezone.utc))
+        .filter(MarketMeta.open_time.isnot(None))
+        .filter(MarketMeta.open_time < cutoff)
         .all()
     )
 

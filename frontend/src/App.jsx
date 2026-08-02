@@ -660,10 +660,13 @@ function ScorePanel({ ticker }) {
 }
 
 // ─── UpcomingMatches ──────────────────────────────────────────────────────────
-const fmtOpen = iso => {
-  if (!iso) return 'time TBD'
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+// match_date is a date only (midnight UTC, from the ticker), not a real
+// moment in time — format it in UTC so the day shown never shifts with the
+// viewer's timezone (a local-time conversion could roll it back a day).
+const fmtMatchDate = iso => {
+  if (!iso) return 'date TBD'
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
   })
 }
 
@@ -751,7 +754,7 @@ function UpcomingMatches({ onPick }) {
               color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
               marginBottom: 8,
             }}>
-              {fmtOpen(m.open_time)}
+              {fmtMatchDate(m.match_date)}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {m.players.map(p => (
@@ -820,12 +823,16 @@ export default function App() {
         display: 'flex', alignItems: 'center', height: 52, gap: 16,
         background: C.surface,
       }}>
-        <span style={{
-          fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
-          color: C.accent, letterSpacing: '0.04em',
-        }}>
+        <button
+          onClick={() => { setSelected(null); setQuery(''); setResults([]); setDropdown(false) }}
+          style={{
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
+            color: C.accent, letterSpacing: '0.04em',
+            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          }}
+        >
           BETMUSE
-        </span>
+        </button>
         <span style={{ color: C.border }}>|</span>
         <span style={{ color: C.muted, fontSize: 12 }}>prediction market analytics</span>
       </div>
