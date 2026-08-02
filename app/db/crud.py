@@ -18,6 +18,35 @@ def latest_snapshot(db: Session, ticker: str):
         .first()
     )
 
+def get_upcoming_markets(db: Session, limit: int = 60) -> list:
+    """Unresolved markets whose close_time is still in the future — i.e.
+    genuinely upcoming or currently live, not just awaiting backstop
+    resolution after close."""
+    return (
+        db.query(MarketMeta)
+        .filter(MarketMeta.result.is_(None))
+        .filter(MarketMeta.event_ticker.isnot(None))
+        .filter(MarketMeta.close_time.isnot(None))
+        .filter(MarketMeta.close_time > datetime.now(timezone.utc))
+        .order_by(MarketMeta.open_time.asc())
+        .limit(limit)
+        .all()
+    )
+
+
+def get_latest_prices(db: Session, tickers: list[str]) -> dict[str, float]:
+    if not tickers:
+        return {}
+    from sqlalchemy import text
+    rows = db.execute(text("""
+        SELECT DISTINCT ON (ticker) ticker, last_price
+        FROM market_snapshots
+        WHERE ticker = ANY(:tickers)
+        ORDER BY ticker, id DESC
+    """), {"tickers": tickers}).fetchall()
+    return {r.ticker: r.last_price for r in rows}
+
+
 def get_unresolved_markets(db: Session):
     from datetime import datetime, timezone
     return (
@@ -154,17 +183,35 @@ def get_market(db: Session, ticker: str):
 
 
 def purge_snapshots(db: Session) -> int:
+    """Safety-net purge for snapshots on markets that never resolve (stuck
+    or orphaned) — resolved markets are removed entirely, meta and all, by
+    purge_resolved_markets below, well before this 7-day window matters."""
     from sqlalchemy import text
     result = db.execute(text("""
-        DELETE FROM market_snapshots
-        WHERE snapshot_time < NOW() - INTERVAL '7 days'
-        OR (
-            snapshot_time < NOW() - INTERVAL '48 hours'
-            AND ticker IN (
-                SELECT ticker FROM market_meta WHERE result IS NOT NULL
-            )
+        DELETE FROM market_snapshots WHERE snapshot_time < NOW() - INTERVAL '7 days'
+    """))
+    db.commit()
+    return result.rowcount
+
+
+def purge_resolved_markets(db: Session) -> int:
+    """Remove markets (and their snapshots/links) more than a day past
+    close_time with a known result. match_events are kept — they're keyed by
+    tennis event, not Kalshi ticker, and stay useful for backtesting after
+    the market itself is gone."""
+    from sqlalchemy import text
+    cutoff = "result IS NOT NULL AND close_time < NOW() - INTERVAL '1 day'"
+    db.execute(text(f"""
+        DELETE FROM market_snapshots WHERE ticker IN (
+            SELECT ticker FROM market_meta WHERE {cutoff}
         )
     """))
+    db.execute(text(f"""
+        DELETE FROM market_links WHERE ticker IN (
+            SELECT ticker FROM market_meta WHERE {cutoff}
+        )
+    """))
+    result = db.execute(text(f"DELETE FROM market_meta WHERE {cutoff}"))
     db.commit()
     return result.rowcount
 

@@ -27,6 +27,14 @@ class ParsedTitle(NamedTuple):
     query: str  # both surnames, accent-stripped, for the provider's event search
 
 
+def player_full_name(title: str) -> str | None:
+    """Extract the market's subject player's full name from the title —
+    the one full name Kalshi's title format gives us (the other player only
+    appears as a surname in the 'A vs B' clause)."""
+    m = _TITLE_RE.match(title)
+    return m.group(1) if m else None
+
+
 def parse_title(title: str) -> ParsedTitle | None:
     m = _TITLE_RE.match(title)
     if not m:

@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 
-from app.db.crud import get_unresolved_markets, resolve_market, purge_snapshots
+from app.db.crud import get_unresolved_markets, purge_resolved_markets, purge_snapshots, resolve_market
 from app.db.session import SessionLocal
 from app.services.market_service import fetch_closed_market
 
@@ -66,5 +66,15 @@ async def backstop(active_markets: dict):
                 logger.info("backstop: purged %d stale snapshots", deleted)
         except Exception:
             logger.exception("backstop: error during snapshot purge")
+        finally:
+            db.close()
+
+        db = SessionLocal()
+        try:
+            removed = await asyncio.to_thread(purge_resolved_markets, db)
+            if removed:
+                logger.info("backstop: removed %d market(s) >1 day past resolution", removed)
+        except Exception:
+            logger.exception("backstop: error during resolved-market purge")
         finally:
             db.close()

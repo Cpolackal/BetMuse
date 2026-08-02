@@ -12,6 +12,7 @@ const SPREAD_THRESHOLD    = 0.01
 const IMBALANCE_THRESHOLD = 0.1
 const VOL_THRESHOLD       = 100
 const LIQUIDITY_THRESHOLD = -5.0
+const MODEL_EDGE_THRESHOLD = 0.04
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 const C = {
@@ -289,6 +290,9 @@ function MarketDetail({ ticker }) {
       {/* Alerts */}
       <MarketAlerts ticker={ticker} />
 
+      {/* Live score */}
+      <ScorePanel ticker={ticker} />
+
       {/* Stats */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         <StatCard label="Price" value={fmt(latest.last_price, 3)} color={C.accent}
@@ -321,15 +325,16 @@ function MarketDetail({ ticker }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
-          <MiniChart title="Price" hint="Last traded price in dollars. On Kalshi, price ≈ probability — $0.65 means the market implies a 65% chance of YES. Bid and ask dashes show the current best quotes.">
-            <LineChart data={seriesFor('last_price', 'yes_bid', 'yes_ask')} margin={chartMargin}>
+          <MiniChart title="Price" hint="Last traded price in dollars. On Kalshi, price ≈ probability — $0.65 means the market implies a 65% chance of YES. Bid and ask dashes show the current best quotes. The amber line is the tennis win-probability model's fair price, when a live score is linked.">
+            <LineChart data={seriesFor('last_price', 'yes_bid', 'yes_ask', 'model_price')} margin={chartMargin}>
               <CartesianGrid {...gridProps} />
               <XAxis {...xAxisProps} />
               <YAxis {...yAxisProps('price ($)')} tickFormatter={v => v.toFixed(3)} />
               <Tooltip content={<ChartTooltip />} />
-              <Line type="monotone" dataKey="last_price" stroke={C.accent} dot={false} strokeWidth={1.5} name="price" />
-              <Line type="monotone" dataKey="yes_bid"    stroke={C.green}  dot={false} strokeWidth={1}   name="bid"   strokeDasharray="3 2" />
-              <Line type="monotone" dataKey="yes_ask"    stroke={C.red}    dot={false} strokeWidth={1}   name="ask"   strokeDasharray="3 2" />
+              <Line type="monotone" dataKey="last_price"  stroke={C.accent} dot={false} strokeWidth={1.5} name="price" />
+              <Line type="monotone" dataKey="yes_bid"     stroke={C.green}  dot={false} strokeWidth={1}   name="bid"   strokeDasharray="3 2" />
+              <Line type="monotone" dataKey="yes_ask"     stroke={C.red}    dot={false} strokeWidth={1}   name="ask"   strokeDasharray="3 2" />
+              <Line type="monotone" dataKey="model_price" stroke={C.amber}  dot={false} strokeWidth={1.5} name="model" strokeDasharray="5 3" connectNulls />
             </LineChart>
           </MiniChart>
 
@@ -518,6 +523,248 @@ function MarketAlerts({ ticker }) {
   )
 }
 
+// ─── Score helpers ────────────────────────────────────────────────────────────
+const fmtEdge = v => v == null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(3)}`
+
+// ─── ScorePanel ───────────────────────────────────────────────────────────────
+function ScorePanel({ ticker }) {
+  const [score, setScore] = useState(null)
+
+  const fetchScore = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/markets/${ticker}/score`)
+      setScore(await r.json())
+    } catch {
+      setScore(null)
+    }
+  }, [ticker])
+
+  useEffect(() => {
+    setScore(null)
+    fetchScore()
+    const id = setInterval(fetchScore, 5_000)
+    return () => clearInterval(id)
+  }, [fetchScore])
+
+  const mapped = score?.mapped
+
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: 6, marginBottom: 16,
+    }}>
+      <div style={{
+        padding: '10px 14px', borderBottom: `1px solid ${C.border}`,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 10,
+          textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted,
+        }}>
+          Live Score
+        </span>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: mapped ? C.green : C.dimmer,
+          boxShadow: mapped ? `0 0 5px ${C.green}` : 'none',
+          transition: 'background 0.3s',
+        }} />
+        {mapped && (
+          <span style={{ color: C.dimmer, fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>
+            {score.tournament}
+          </span>
+        )}
+      </div>
+
+      {!mapped ? (
+        <div style={{
+          padding: '14px 16px',
+          color: C.dimmer, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11,
+        }}>
+          no live match linked — this market isn't mapped to a live tennis score
+        </div>
+      ) : (
+        <div style={{ padding: '14px 16px' }}>
+          {/* Players + serve indicator */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            {[
+              { name: score.home, side: 1 },
+              { name: score.away, side: 2 },
+            ].map(p => (
+              <div key={p.side} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: score.serving === p.side ? C.accent : 'transparent',
+                  boxShadow: score.serving === p.side ? `0 0 5px ${C.accent}` : 'none',
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: 14, fontWeight: score.side === p.side ? 600 : 400,
+                  color: score.side === p.side ? C.text : C.muted,
+                }}>
+                  {p.name}
+                </span>
+                {score.side === p.side && (
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
+                    color: C.accent, background: C.accentDim,
+                    padding: '1px 5px', borderRadius: 3,
+                  }}>
+                    YES
+                  </span>
+                )}
+                <span style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                  {(score.set_games || []).map((set, i) => (
+                    <span key={i} style={{
+                      fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
+                      color: i === score.set_games.length - 1 ? C.text : C.dimmer,
+                      minWidth: 14, textAlign: 'center',
+                    }}>
+                      {p.side === 1 ? set[0] : set[1]}
+                    </span>
+                  ))}
+                  <span style={{
+                    fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 600,
+                    color: C.text, minWidth: 20, textAlign: 'center',
+                    borderLeft: `1px solid ${C.border}`, paddingLeft: 8,
+                  }}>
+                    {(score.points || [])[p.side === 1 ? 0 : 1]}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+          {score.tiebreak && (
+            <div style={{
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: 9,
+              color: C.violet, marginBottom: 12,
+            }}>
+              TIEBREAK
+            </div>
+          )}
+
+          {/* Model stats */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <StatCard label="Model Price" value={fmt(score.model_price, 3)} color={C.amber}
+              hint="Closed-form tennis win-probability model's fair price for this market's side, computed from the live score and each player's calibrated serve-win rate." />
+            <StatCard label="Market Price" value={fmt(score.market_price, 3)} color={C.accent}
+              hint="Current market mid-price for comparison against the model." />
+            <StatCard label="Edge" value={fmtEdge(score.edge)}
+              color={Math.abs(score.edge || 0) >= MODEL_EDGE_THRESHOLD ? C.amber : C.text}
+              hint="Market price minus model price. Positive means the market is pricing this side richer than the model; negative means cheaper. Amber when large enough to trigger a model-divergence alert." />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── UpcomingMatches ──────────────────────────────────────────────────────────
+const fmtOpen = iso => {
+  if (!iso) return 'time TBD'
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
+}
+
+function PlayerChip({ player, onPick }) {
+  return (
+    <button
+      onClick={() => onPick(player.ticker)}
+      style={{
+        flex: 1, minWidth: 0, textAlign: 'left', cursor: 'pointer',
+        background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: 5, padding: '8px 10px',
+        display: 'flex', flexDirection: 'column', gap: 4,
+        font: 'inherit', color: 'inherit',
+      }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
+      onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+    >
+      <span style={{
+        fontSize: 12, color: C.text, overflow: 'hidden',
+        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {player.name}
+      </span>
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
+        color: player.price == null ? C.dimmer : C.accent,
+      }}>
+        {player.price == null ? '—' : fmt(player.price, 3)}
+      </span>
+    </button>
+  )
+}
+
+function UpcomingMatches({ onPick }) {
+  const [matches, setMatches] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`${API}/markets/upcoming?limit=24`)
+      .then(r => r.json())
+      .then(d => setMatches(d.matches || []))
+      .catch(() => setMatches([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{
+        color: C.dimmer, textAlign: 'center', padding: 40,
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
+      }}>
+        loading upcoming ATP matches...
+      </div>
+    )
+  }
+
+  if (matches.length === 0) {
+    return (
+      <div style={{
+        color: C.dimmer, textAlign: 'center', padding: '60px 24px',
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: 13,
+      }}>
+        no upcoming ATP matches right now — search for a market above
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{
+        color: C.muted, fontSize: 10, textTransform: 'uppercase',
+        letterSpacing: '0.08em', marginBottom: 12,
+      }}>
+        Upcoming ATP Matches
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10,
+      }}>
+        {matches.map(m => (
+          <div key={m.event_ticker} style={{
+            background: C.card, border: `1px solid ${C.border}`,
+            borderRadius: 6, padding: '12px 14px',
+          }}>
+            <div style={{
+              color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
+              marginBottom: 8,
+            }}>
+              {fmtOpen(m.open_time)}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {m.players.map(p => (
+                <PlayerChip key={p.ticker} player={p} onPick={onPick} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [query, setQuery]           = useState('')
@@ -553,6 +800,8 @@ export default function App() {
     setQuery(market.title)
     setDropdown(false)
   }
+
+  const pickTicker = ticker => setSelected(ticker)
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
@@ -680,17 +929,10 @@ export default function App() {
           )}
         </div>
 
-        {/* Detail or placeholder */}
+        {/* Detail or landing page */}
         {selected
           ? <MarketDetail key={selected} ticker={selected} />
-          : (
-            <div style={{
-              textAlign: 'center', padding: '80px 24px',
-              color: C.dimmer, fontFamily: "'IBM Plex Mono', monospace", fontSize: 13,
-            }}>
-              search for a market above to view analytics
-            </div>
-          )
+          : <UpcomingMatches onPick={pickTicker} />
         }
 
       </div>

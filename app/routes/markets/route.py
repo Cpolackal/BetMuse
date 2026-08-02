@@ -6,9 +6,17 @@ from sqlalchemy.orm import Session
 
 from app.core.live_state import market_links, match_states, model_prices
 from app.core.market_filter import is_allowed_market
-from app.db.crud import get_market, get_snapshots, search_markets, set_market
+from app.db.crud import (
+    get_latest_prices,
+    get_market,
+    get_snapshots,
+    get_upcoming_markets,
+    search_markets,
+    set_market,
+)
 from app.db.session import get_db
 from app.services.market_service import fetch_markets
+from app.services.match_mapper import player_full_name
 
 router = APIRouter()
 
@@ -37,6 +45,30 @@ async def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db
             for m in markets
         ]
     }
+
+
+@router.get("/upcoming")
+async def upcoming_matches(limit: int = Query(20, ge=1, le=50), db: Session = Depends(get_db)):
+    rows = await asyncio.to_thread(get_upcoming_markets, db, limit * 3)
+    prices = await asyncio.to_thread(get_latest_prices, db, [m.ticker for m in rows])
+
+    events: dict[str, dict] = {}
+    order: list[str] = []
+    for m in rows:
+        key = m.event_ticker
+        ev = events.get(key)
+        if ev is None:
+            ev = {"event_ticker": key, "open_time": m.open_time, "close_time": m.close_time, "players": []}
+            events[key] = ev
+            order.append(key)
+        ev["players"].append({
+            "ticker": m.ticker,
+            "name": player_full_name(m.title) or m.title,
+            "price": prices.get(m.ticker),
+        })
+
+    matches = [events[k] for k in order if len(events[k]["players"]) == 2][:limit]
+    return {"matches": matches}
 
 
 @router.get("/{ticker}/snapshots")
