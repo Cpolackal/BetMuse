@@ -670,20 +670,14 @@ const fmtMatchDate = iso => {
   })
 }
 
-function PlayerChip({ player, onPick }) {
+function PlayerTile({ player }) {
   return (
-    <button
-      onClick={() => onPick(player.ticker)}
-      style={{
-        flex: 1, minWidth: 0, textAlign: 'left', cursor: 'pointer',
-        background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: 5, padding: '8px 10px',
-        display: 'flex', flexDirection: 'column', gap: 4,
-        font: 'inherit', color: 'inherit',
-      }}
-      onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
-      onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
-    >
+    <div style={{
+      flex: 1, minWidth: 0,
+      background: C.surface, border: `1px solid ${C.border}`,
+      borderRadius: 5, padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
       <span style={{
         fontSize: 12, color: C.text, overflow: 'hidden',
         textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -696,7 +690,7 @@ function PlayerChip({ player, onPick }) {
       }}>
         {player.price == null ? '—' : fmt(player.price, 3)}
       </span>
-    </button>
+    </div>
   )
 }
 
@@ -746,10 +740,17 @@ function UpcomingMatches({ onPick }) {
         display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10,
       }}>
         {matches.map(m => (
-          <div key={m.event_ticker} style={{
-            background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: 6, padding: '12px 14px',
-          }}>
+          <button
+            key={m.event_ticker}
+            onClick={() => onPick(m.players[0]?.ticker)}
+            style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: 6, padding: '12px 14px', textAlign: 'left', cursor: 'pointer',
+              font: 'inherit', color: 'inherit', width: '100%',
+            }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
+            onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+          >
             <div style={{
               color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
               marginBottom: 8,
@@ -758,10 +759,10 @@ function UpcomingMatches({ onPick }) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {m.players.map(p => (
-                <PlayerChip key={p.ticker} player={p} onPick={onPick} />
+                <PlayerTile key={p.ticker} player={p} />
               ))}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
