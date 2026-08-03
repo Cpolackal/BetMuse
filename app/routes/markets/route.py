@@ -4,10 +4,19 @@ import math
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.live_state import market_links, match_states, model_prices
 from app.core.market_filter import is_allowed_market
-from app.db.crud import get_market, get_snapshots, search_markets, set_market
+from app.db.crud import (
+    get_latest_prices,
+    get_market,
+    get_snapshots,
+    get_upcoming_markets,
+    search_markets,
+    set_market,
+)
 from app.db.session import get_db
 from app.services.market_service import fetch_markets
+from app.services.match_mapper import player_full_name, ticker_date
 
 router = APIRouter()
 
@@ -36,6 +45,38 @@ async def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db
             for m in markets
         ]
     }
+
+
+@router.get("/upcoming")
+async def upcoming_matches(limit: int = Query(20, ge=1, le=50), db: Session = Depends(get_db)):
+    rows = await asyncio.to_thread(get_upcoming_markets, db, limit * 3)
+    prices = await asyncio.to_thread(get_latest_prices, db, [m.ticker for m in rows])
+
+    events: dict[str, dict] = {}
+    order: list[str] = []
+    for m in rows:
+        key = m.event_ticker
+        ev = events.get(key)
+        if ev is None:
+            ev = {
+                "event_ticker": key,
+                # The actual scheduled match date, not open_time (when
+                # trading opens — often the day before the match).
+                "match_date": ticker_date(m.ticker),
+                "open_time": m.open_time,
+                "close_time": m.close_time,
+                "players": [],
+            }
+            events[key] = ev
+            order.append(key)
+        ev["players"].append({
+            "ticker": m.ticker,
+            "name": player_full_name(m.title) or m.title,
+            "price": prices.get(m.ticker),
+        })
+
+    matches = [events[k] for k in order if len(events[k]["players"]) == 2][:limit]
+    return {"matches": matches}
 
 
 @router.get("/{ticker}/snapshots")
@@ -68,9 +109,38 @@ async def market_snapshots(
                 "open_interest": _f(r.open_interest),
                 "bid_size": _f(r.bid_size),
                 "ask_size": _f(r.ask_size),
+                "model_price": _f(r.model_price),
             }
             for r in rows
         ],
+    }
+
+
+@router.get("/{ticker}/score")
+async def market_score(ticker: str):
+    link = market_links.get(ticker)
+    state = match_states.get(link[0]) if link else None
+    if link is None or state is None:
+        return {"mapped": False}
+
+    event_id, side = link
+    model = model_prices.get(ticker)
+    return {
+        "mapped": True,
+        "event_id": event_id,
+        "side": side,
+        "home": state.home,
+        "away": state.away,
+        "tournament": state.tournament,
+        "status": state.status,
+        "best_of": state.best_of,
+        "set_games": state.set_games,
+        "points": state.points,
+        "serving": state.serving,
+        "tiebreak": state.tiebreak,
+        "model_price": model.get("model_price") if model else None,
+        "market_price": model.get("market_price") if model else None,
+        "edge": model.get("edge") if model else None,
     }
 
 

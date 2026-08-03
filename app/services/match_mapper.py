@@ -27,6 +27,14 @@ class ParsedTitle(NamedTuple):
     query: str  # both surnames, accent-stripped, for the provider's event search
 
 
+def player_full_name(title: str) -> str | None:
+    """Extract the market's subject player's full name from the title —
+    the one full name Kalshi's title format gives us (the other player only
+    appears as a surname in the 'A vs B' clause)."""
+    m = _TITLE_RE.match(title)
+    return m.group(1) if m else None
+
+
 def parse_title(title: str) -> ParsedTitle | None:
     m = _TITLE_RE.match(title)
     if not m:
@@ -45,7 +53,10 @@ def parse_title(title: str) -> ParsedTitle | None:
     return ParsedTitle(mine, theirs, f"{_ascii(surname_a)} {_ascii(surname_b)}")
 
 
-def _ticker_date(ticker: str) -> datetime | None:
+def ticker_date(ticker: str) -> datetime | None:
+    """The actual scheduled match date embedded in the ticker. Kalshi's own
+    market_meta.open_time is when trading opens — often the day before the
+    match — so it's the wrong field to show as "the match date"."""
     m = _TICKER_DATE_RE.search(ticker)
     if not m:
         return None
@@ -69,7 +80,7 @@ def select_event(
     count. Returns None on any ambiguity — an unmapped market just retries
     later, while a wrongly mapped one silently poisons downstream edge
     computation."""
-    market_date = _ticker_date(ticker)
+    market_date = ticker_date(ticker)
 
     matched: list[tuple[int, int]] = []
     for match in candidates:

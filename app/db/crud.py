@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 from app.db.models.market import (
@@ -18,13 +18,58 @@ def latest_snapshot(db: Session, ticker: str):
         .first()
     )
 
-def get_unresolved_markets(db: Session):
-    from datetime import datetime, timezone
+def get_upcoming_markets(db: Session, limit: int = 60) -> list:
+    """Markets for matches that haven't concluded: not yet started, or
+    started recently enough to plausibly still be in progress.
+
+    close_time is Kalshi's outer trading-window deadline (often ~2 weeks
+    out for tennis) — not a signal the match itself is over — so it can't
+    be used to exclude finished matches. open_time tracks the actual
+    scheduled start far more closely; the 8h cutoff is generous enough to
+    cover a slow best-of-5 without holding on to long-finished matches
+    that are simply awaiting Kalshi's own resolution lag (see
+    get_unresolved_markets)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=8)
     return (
         db.query(MarketMeta)
         .filter(MarketMeta.result.is_(None))
-        .filter(MarketMeta.close_time.isnot(None))
-        .filter(MarketMeta.close_time < datetime.now(timezone.utc))
+        .filter(MarketMeta.event_ticker.isnot(None))
+        .filter(MarketMeta.open_time.isnot(None))
+        .filter(MarketMeta.open_time > cutoff)
+        .order_by(MarketMeta.open_time.asc())
+        .limit(limit)
+        .all()
+    )
+
+
+def get_latest_prices(db: Session, tickers: list[str]) -> dict[str, float]:
+    if not tickers:
+        return {}
+    from sqlalchemy import text
+    rows = db.execute(text("""
+        SELECT DISTINCT ON (ticker) ticker, last_price
+        FROM market_snapshots
+        WHERE ticker = ANY(:tickers)
+        ORDER BY ticker, id DESC
+    """), {"tickers": tickers}).fetchall()
+    return {r.ticker: r.last_price for r in rows}
+
+
+def get_unresolved_markets(db: Session):
+    """Markets backstop should check against Kalshi's historical API for a
+    result. Gated on open_time, not close_time: close_time is Kalshi's
+    outer trading-window deadline (often ~2 weeks past the match), so
+    gating on it means a match that finished hours ago wouldn't even be
+    checked until close_time arrives — result stays NULL indefinitely, and
+    the match keeps showing up as "upcoming" (see get_upcoming_markets).
+    3h covers a slow best-of-5; a still-in-progress match's fetch just
+    comes back empty and gets retried next cycle."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=3)
+    return (
+        db.query(MarketMeta)
+        .filter(MarketMeta.result.is_(None))
+        .filter(MarketMeta.open_time.isnot(None))
+        .filter(MarketMeta.open_time < cutoff)
         .all()
     )
 
@@ -140,10 +185,24 @@ def get_all_market_links(db: Session) -> list:
 
 
 def search_markets(db: Session, q: str) -> list:
+    """Resolved markets are kept until purge_resolved_markets removes them
+    (~1 day post-resolution), so they're fine to surface as-is. Unresolved
+    ones are excluded once their open_time is more than a day in the past —
+    without this, a market backstop hasn't gotten to yet (or, historically,
+    the close_time-gating bug — see get_unresolved_markets) would keep
+    surfacing in search for as long as it sat unresolved, which was
+    observed to be up to ~2 weeks."""
+    from sqlalchemy import or_
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     return (
         db.query(MarketMeta)
         .filter(MarketMeta.title.ilike(f"%{q}%"))
-        .order_by(MarketMeta.close_time.desc())
+        .filter(or_(
+            MarketMeta.result.isnot(None),
+            MarketMeta.open_time.is_(None),
+            MarketMeta.open_time > cutoff,
+        ))
+        .order_by(MarketMeta.open_time.desc())
         .limit(50)
         .all()
     )
@@ -154,17 +213,35 @@ def get_market(db: Session, ticker: str):
 
 
 def purge_snapshots(db: Session) -> int:
+    """Safety-net purge for snapshots on markets that never resolve (stuck
+    or orphaned) — resolved markets are removed entirely, meta and all, by
+    purge_resolved_markets below, well before this 7-day window matters."""
     from sqlalchemy import text
     result = db.execute(text("""
-        DELETE FROM market_snapshots
-        WHERE snapshot_time < NOW() - INTERVAL '7 days'
-        OR (
-            snapshot_time < NOW() - INTERVAL '48 hours'
-            AND ticker IN (
-                SELECT ticker FROM market_meta WHERE result IS NOT NULL
-            )
+        DELETE FROM market_snapshots WHERE snapshot_time < NOW() - INTERVAL '7 days'
+    """))
+    db.commit()
+    return result.rowcount
+
+
+def purge_resolved_markets(db: Session) -> int:
+    """Remove markets (and their snapshots/links) more than a day past
+    close_time with a known result. match_events are kept — they're keyed by
+    tennis event, not Kalshi ticker, and stay useful for backtesting after
+    the market itself is gone."""
+    from sqlalchemy import text
+    cutoff = "result IS NOT NULL AND close_time < NOW() - INTERVAL '1 day'"
+    db.execute(text(f"""
+        DELETE FROM market_snapshots WHERE ticker IN (
+            SELECT ticker FROM market_meta WHERE {cutoff}
         )
     """))
+    db.execute(text(f"""
+        DELETE FROM market_links WHERE ticker IN (
+            SELECT ticker FROM market_meta WHERE {cutoff}
+        )
+    """))
+    result = db.execute(text(f"DELETE FROM market_meta WHERE {cutoff}"))
     db.commit()
     return result.rowcount
 
