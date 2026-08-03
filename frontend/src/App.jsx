@@ -14,22 +14,22 @@ const VOL_THRESHOLD       = 100
 const LIQUIDITY_THRESHOLD = -5.0
 const MODEL_EDGE_THRESHOLD = 0.04
 
-// ─── Palette ─────────────────────────────────────────────────────────────────
+// ─── Palette ── court-at-dusk: deep grass-shadow ground, optic-ball accent ────
 const C = {
-  bg:        '#0a0c12',
-  surface:   '#111420',
-  card:      '#161926',
-  border:    '#1f2438',
-  accent:    '#6366f1',
-  accentDim: '#3d3f7a',
-  text:      '#e2e8f0',
-  muted:     '#64748b',
-  dimmer:    '#334155',
-  green:     '#22c55e',
-  red:       '#ef4444',
-  amber:     '#f59e0b',
-  cyan:      '#06b6d4',
-  violet:    '#a78bfa',
+  bg:        '#0a120e',
+  surface:   '#101c16',
+  card:      '#14211a',
+  border:    '#22362a',
+  accent:    '#d7f24a',
+  accentDim: '#3c4a24',
+  text:      '#eef2e9',
+  muted:     '#7e9382',
+  dimmer:    '#3d5245',
+  green:     '#6fae4a',
+  red:       '#c1502e',
+  amber:     '#d9a441',
+  cyan:      '#4a90c4',
+  violet:    '#9b7fc7',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -246,9 +246,9 @@ function MarketDetail({ ticker }) {
   const seriesFor = (...keys) => snapshots.filter(r => keys.some(k => r[k] != null))
 
   const resultBadge = meta?.result === true
-    ? { label: 'YES',  bg: '#14532d', color: C.green }
+    ? { label: 'YES',  bg: '#1c3320', color: C.green }
     : meta?.result === false
-      ? { label: 'NO',   bg: '#450a0a', color: C.red }
+      ? { label: 'NO',   bg: '#3a1f16', color: C.red }
       : { label: 'OPEN', bg: C.accentDim, color: C.accent }
 
   return (
@@ -670,23 +670,26 @@ const fmtMatchDate = iso => {
   })
 }
 
-function PlayerTile({ player }) {
+// A row on a match card reads like a scorebug: name left, price right in
+// tabular digits, with a felt-yellow rail marking whoever the market favors.
+function PlayerRow({ player, leading }) {
   return (
     <div style={{
-      flex: 1, minWidth: 0,
-      background: C.surface, border: `1px solid ${C.border}`,
-      borderRadius: 5, padding: '8px 10px',
-      display: 'flex', flexDirection: 'column', gap: 4,
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '8px 10px 8px 9px',
+      borderLeft: `3px solid ${leading ? C.accent : 'transparent'}`,
     }}>
       <span style={{
-        fontSize: 12, color: C.text, overflow: 'hidden',
-        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        flex: 1, minWidth: 0, fontSize: 13,
+        color: leading ? C.text : C.muted, fontWeight: leading ? 600 : 400,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {player.name}
       </span>
       <span style={{
-        fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
-        color: player.price == null ? C.dimmer : C.accent,
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, fontWeight: 600,
+        fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign: 'right',
+        color: player.price == null ? C.dimmer : (leading ? C.accent : C.muted),
       }}>
         {player.price == null ? '—' : fmt(player.price, 3)}
       </span>
@@ -730,40 +733,52 @@ function UpcomingMatches({ onPick }) {
 
   return (
     <div>
-      <div style={{
-        color: C.muted, fontSize: 10, textTransform: 'uppercase',
-        letterSpacing: '0.08em', marginBottom: 12,
-      }}>
-        Upcoming ATP Matches
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%', background: C.accent,
+          animation: 'livePulse 1.8s ease-in-out infinite',
+        }} />
+        <span style={{
+          color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em',
+        }}>
+          Today on the Tour
+        </span>
       </div>
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10,
       }}>
-        {matches.map(m => (
-          <button
-            key={m.event_ticker}
-            onClick={() => onPick(m.players[0]?.ticker)}
-            style={{
-              background: C.card, border: `1px solid ${C.border}`,
-              borderRadius: 6, padding: '12px 14px', textAlign: 'left', cursor: 'pointer',
-              font: 'inherit', color: 'inherit', width: '100%',
-            }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
-            onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
-          >
-            <div style={{
-              color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
-              marginBottom: 8,
-            }}>
-              {fmtMatchDate(m.match_date)}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {m.players.map(p => (
-                <PlayerTile key={p.ticker} player={p} />
+        {matches.map(m => {
+          const [p0, p1] = m.players
+          const leadIdx = p0?.price != null && p1?.price != null && p0.price !== p1.price
+            ? (p0.price > p1.price ? 0 : 1) : -1
+          return (
+            <button
+              key={m.event_ticker}
+              onClick={() => onPick(m.players[0]?.ticker)}
+              style={{
+                background: C.card, border: `1px solid ${C.border}`,
+                borderRadius: 4, padding: '10px 0', textAlign: 'left', cursor: 'pointer',
+                font: 'inherit', color: 'inherit', width: '100%',
+                transition: 'border-color 0.15s, transform 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accentDim; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = 'translateY(0)' }}
+            >
+              <div style={{
+                color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
+                padding: '0 12px 8px',
+              }}>
+                {fmtMatchDate(m.match_date)}
+              </div>
+              {m.players.map((p, i) => (
+                <div key={p.ticker}>
+                  <PlayerRow player={p} leading={leadIdx === i} />
+                  {i === 0 && <div style={{ height: 1, background: C.border, margin: '0 10px' }} />}
+                </div>
               ))}
-            </div>
-          </button>
-        ))}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -810,43 +825,48 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: ${C.bg}; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
         input::placeholder { color: ${C.dimmer}; }
+        @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
       `}</style>
 
-      {/* Topbar */}
-      <div style={{
-        borderBottom: `1px solid ${C.border}`, padding: '0 32px',
-        display: 'flex', alignItems: 'center', height: 52, gap: 16,
-        background: C.surface,
-      }}>
-        <button
-          onClick={() => { setSelected(null); setQuery(''); setResults([]); setDropdown(false) }}
-          style={{
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
-            color: C.accent, letterSpacing: '0.04em',
-            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-          }}
-        >
-          BETMUSE
-        </button>
-        <span style={{ color: C.border }}>|</span>
-        <span style={{ color: C.muted, fontSize: 12 }}>prediction market analytics</span>
+      {/* Topbar — a doubles sideline: two hairlines standing in for the tramlines */}
+      <div style={{ background: C.surface }}>
+        <div style={{
+          padding: '0 32px', display: 'flex', alignItems: 'center', height: 68, gap: 14,
+        }}>
+          <button
+            onClick={() => { setSelected(null); setQuery(''); setResults([]); setDropdown(false) }}
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, fontWeight: 400,
+              color: C.accent, letterSpacing: '0.06em',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              lineHeight: 1.4, display: 'flex', alignItems: 'center',
+            }}
+          >
+            BETMUSE
+          </button>
+          <span style={{ width: 1, height: 14, background: C.border }} />
+          <span style={{ color: C.muted, fontSize: 12 }}>live win probability, every ATP match</span>
+        </div>
+        <div style={{ height: 1, background: C.border }} />
+        <div style={{ height: 1, background: C.border, opacity: 0.4, marginTop: 3 }} />
       </div>
 
       {/* Main */}
       <div style={{ maxWidth: 1440, margin: '0 auto', padding: '32px 24px' }}>
 
-        {/* Search */}
+        {/* Search — styled as a scoreboard panel: a felt-yellow edge strip */}
         <div ref={wrapRef} style={{ position: 'relative', marginBottom: 28 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             background: C.surface, border: `1px solid ${dropdownOpen ? C.accentDim : C.border}`,
-            borderRadius: dropdownOpen && results.length ? '6px 6px 0 0' : 6,
+            borderLeft: `3px solid ${dropdownOpen ? C.accent : C.dimmer}`,
+            borderRadius: dropdownOpen && results.length ? '2px 6px 0 0' : '2px 6px 6px 2px',
             padding: '10px 16px', transition: 'border-color 0.15s',
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2">
@@ -857,7 +877,7 @@ export default function App() {
               value={query}
               onChange={e => { setQuery(e.target.value); setSelected(null) }}
               onFocus={() => results.length && setDropdown(true)}
-              placeholder="Search markets by name..."
+              placeholder="Search players or matchups..."
               style={{
                 flex: 1, background: 'transparent', border: 'none', outline: 'none',
                 color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif",
