@@ -21,23 +21,13 @@ class ScoreProvider(Protocol):
     async def search_events(self, query: str) -> list[MatchState]: ...
 
 
-def _current_server(first_to_serve: int | None, games_completed: int,
-                    tiebreak: bool, points: tuple[str, str]) -> int | None:
-    if first_to_serve not in (1, 2):
-        return None
-    # Serve alternates every game; total completed games gives parity. This
-    # also holds across a tiebreak set boundary (the TB counts as one game and
-    # the post-TB serve rule matches simple alternation).
-    server = first_to_serve if games_completed % 2 == 0 else 3 - first_to_serve
-    if tiebreak:
-        # Within a tiebreak serve changes after the 1st point, then every 2.
-        try:
-            played = int(points[0]) + int(points[1])
-        except ValueError:
-            return server
-        if (played + 1) // 2 % 2 == 1:
-            server = 3 - server
-    return server
+def _current_server(first_to_serve: int | None) -> int | None:
+    # Despite the name, SofaScore live-updates firstToServe every game to the
+    # player serving the *current* game (verified empirically: it alternates
+    # 1↔2 at each game boundary mid-set). So it's already the answer — any
+    # extra parity math on top of it flips in lockstep with the field itself
+    # and cancels out, freezing the derived server for the whole match.
+    return first_to_serve if first_to_serve in (1, 2) else None
 
 
 def parse_event(event: dict[str, Any]) -> MatchState:
@@ -53,7 +43,6 @@ def parse_event(event: dict[str, Any]) -> MatchState:
 
     points = (str(home_score.get("point", "0")), str(away_score.get("point", "0")))
     tiebreak = bool(set_games) and set_games[-1][0] == 6 and set_games[-1][1] == 6
-    games_completed = sum(h + a for h, a in set_games)
 
     tournament = event.get("tournament", {}).get("name", "")
     best_of = 5 if any(s in tournament.lower() for s in GRAND_SLAMS) else 3
@@ -68,7 +57,7 @@ def parse_event(event: dict[str, Any]) -> MatchState:
         status=event.get("status", {}).get("type", "unknown"),
         set_games=set_games,
         points=points,
-        serving=_current_server(event.get("firstToServe"), games_completed, tiebreak, points),
+        serving=_current_server(event.get("firstToServe")),
         tiebreak=tiebreak,
         start_ts=event.get("startTimestamp", 0),
         updated_at=time.time(),

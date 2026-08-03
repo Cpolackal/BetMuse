@@ -52,6 +52,27 @@ def get_upcoming_markets(db: Session, limit: int = 60) -> list:
     return [m for m, _ in dated[:limit]]
 
 
+def get_completed_markets(db: Session, limit: int = 40) -> list:
+    """Recently resolved markets, most recently played first. Bounded by
+    purge_resolved_markets (removes anything resolved more than a day ago),
+    so no extra date filtering needed here — ordering uses the
+    ticker-embedded date (see get_upcoming_markets for why that's the only
+    trustworthy per-match date we have)."""
+    from app.services.match_mapper import ticker_date
+
+    candidates = (
+        db.query(MarketMeta)
+        .filter(MarketMeta.result.isnot(None))
+        .filter(MarketMeta.event_ticker.isnot(None))
+        .order_by(MarketMeta.open_time.desc())
+        .limit(max(limit * 6, 300))
+        .all()
+    )
+    dated = [(m, ticker_date(m.ticker)) for m in candidates]
+    dated.sort(key=lambda pair: pair[1] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return [m for m, _ in dated[:limit]]
+
+
 def get_latest_prices(db: Session, tickers: list[str]) -> dict[str, float]:
     if not tickers:
         return {}
