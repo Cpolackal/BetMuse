@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.live_state import market_links, match_states, model_prices
 from app.core.market_filter import is_allowed_market
 from app.db.crud import (
+    get_completed_markets,
     get_latest_prices,
     get_market,
     get_snapshots,
@@ -49,22 +50,73 @@ async def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db
 
 @router.get("/upcoming")
 async def upcoming_matches(limit: int = Query(20, ge=1, le=50), db: Session = Depends(get_db)):
+    # --- Live: straight from SofaScore's live response (live_state.match_states),
+    # not any persisted/cached signal — this is exactly "what SofaScore says
+    # is live right now", refreshed every 5s, so it can't go stale the way a
+    # database reading could. live_total counts every live ATP match
+    # SofaScore reports, whether or not it has a Kalshi market mapped yet,
+    # so the frontend can distinguish "nothing is being played" from
+    # "matches are live, just not mapped to a market yet".
+    by_event: dict[int, list[tuple[str, int]]] = {}
+    for ticker, link in market_links.items():
+        by_event.setdefault(link[0], []).append((ticker, link[1]))
+
+    live_total = len(match_states)
+    live_candidates = [
+        (event_id, state, by_event[event_id])
+        for event_id, state in match_states.items()
+        if event_id in by_event
+    ]
+    live_tickers = [t for _, _, tickers in live_candidates for t, _ in tickers]
+    live_prices = await asyncio.to_thread(get_latest_prices, db, live_tickers)
+
+    live = []
+    live_event_ids: set[int] = set()
+    for event_id, state, tickers in live_candidates:
+        # Home side first: the live card indexes players[0] as home when it
+        # attaches set scores, points, and the serve dot, and ticker iteration
+        # order carries no such guarantee.
+        players = [
+            {"ticker": t, "name": state.home if side == 1 else state.away, "price": live_prices.get(t)}
+            for t, side in sorted(tickers, key=lambda pair: pair[1])
+        ]
+        if len(players) != 2:
+            continue
+        live_event_ids.add(event_id)
+        live.append({
+            "event_id": event_id,
+            "home": state.home,
+            "away": state.away,
+            "tournament": state.tournament,
+            "status": state.status,
+            "set_games": state.set_games,
+            "points": state.points,
+            "serving": state.serving,
+            "tiebreak": state.tiebreak,
+            "players": players,
+        })
+
+    # --- Upcoming: unresolved, not already shown as live ---
     rows = await asyncio.to_thread(get_upcoming_markets, db, limit * 3)
     prices = await asyncio.to_thread(get_latest_prices, db, [m.ticker for m in rows])
 
     events: dict[str, dict] = {}
     order: list[str] = []
     for m in rows:
+        link = market_links.get(m.ticker)
+        if link and link[0] in live_event_ids:
+            continue
         key = m.event_ticker
         ev = events.get(key)
         if ev is None:
             ev = {
                 "event_ticker": key,
-                # The actual scheduled match date, not open_time (when
-                # trading opens — often the day before the match).
-                "match_date": ticker_date(m.ticker),
+                # open_time is when Kalshi opened trading — the one
+                # scheduling fact about this match we can actually verify.
+                # The match's own start time can't be, especially once a
+                # delay is in play (see get_upcoming_markets), so we don't
+                # claim to know it here.
                 "open_time": m.open_time,
-                "close_time": m.close_time,
                 "players": [],
             }
             events[key] = ev
@@ -74,9 +126,29 @@ async def upcoming_matches(limit: int = Query(20, ge=1, le=50), db: Session = De
             "name": player_full_name(m.title) or m.title,
             "price": prices.get(m.ticker),
         })
-
     matches = [events[k] for k in order if len(events[k]["players"]) == 2][:limit]
-    return {"matches": matches}
+
+    # --- Completed: resolved ---
+    completed_rows = await asyncio.to_thread(get_completed_markets, db, limit)
+    completed_events: dict[str, dict] = {}
+    completed_order: list[str] = []
+    for m in completed_rows:
+        key = m.event_ticker
+        ev = completed_events.get(key)
+        if ev is None:
+            ev = {"event_ticker": key, "match_date": ticker_date(m.ticker), "players": []}
+            completed_events[key] = ev
+            completed_order.append(key)
+        ev["players"].append({
+            "ticker": m.ticker,
+            "name": player_full_name(m.title) or m.title,
+            "won": m.result,
+        })
+    completed = [
+        completed_events[k] for k in completed_order if len(completed_events[k]["players"]) == 2
+    ][:limit]
+
+    return {"live": live, "live_total": live_total, "upcoming": matches, "completed": completed}
 
 
 @router.get("/{ticker}/snapshots")

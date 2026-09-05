@@ -14,22 +14,22 @@ const VOL_THRESHOLD       = 100
 const LIQUIDITY_THRESHOLD = -5.0
 const MODEL_EDGE_THRESHOLD = 0.04
 
-// ─── Palette ─────────────────────────────────────────────────────────────────
+// ─── Palette ── court-at-dusk: deep grass-shadow ground, optic-ball accent ────
 const C = {
-  bg:        '#0a0c12',
-  surface:   '#111420',
-  card:      '#161926',
-  border:    '#1f2438',
-  accent:    '#6366f1',
-  accentDim: '#3d3f7a',
-  text:      '#e2e8f0',
-  muted:     '#64748b',
-  dimmer:    '#334155',
-  green:     '#22c55e',
-  red:       '#ef4444',
-  amber:     '#f59e0b',
-  cyan:      '#06b6d4',
-  violet:    '#a78bfa',
+  bg:        '#0a120e',
+  surface:   '#101c16',
+  card:      '#14211a',
+  border:    '#22362a',
+  accent:    '#d7f24a',
+  accentDim: '#3c4a24',
+  text:      '#eef2e9',
+  muted:     '#7e9382',
+  dimmer:    '#3d5245',
+  green:     '#6fae4a',
+  red:       '#c1502e',
+  amber:     '#d9a441',
+  cyan:      '#4a90c4',
+  violet:    '#9b7fc7',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -246,9 +246,9 @@ function MarketDetail({ ticker }) {
   const seriesFor = (...keys) => snapshots.filter(r => keys.some(k => r[k] != null))
 
   const resultBadge = meta?.result === true
-    ? { label: 'YES',  bg: '#14532d', color: C.green }
+    ? { label: 'YES',  bg: '#1c3320', color: C.green }
     : meta?.result === false
-      ? { label: 'NO',   bg: '#450a0a', color: C.red }
+      ? { label: 'NO',   bg: '#3a1f16', color: C.red }
       : { label: 'OPEN', bg: C.accentDim, color: C.accent }
 
   return (
@@ -659,7 +659,7 @@ function ScorePanel({ ticker }) {
   )
 }
 
-// ─── UpcomingMatches ──────────────────────────────────────────────────────────
+// ─── Matches overview (Live / Upcoming / Completed) ──────────────────────────
 // match_date is a date only (midnight UTC, from the ticker), not a real
 // moment in time — format it in UTC so the day shown never shifts with the
 // viewer's timezone (a local-time conversion could roll it back a day).
@@ -670,23 +670,69 @@ const fmtMatchDate = iso => {
   })
 }
 
-function PlayerTile({ player }) {
+// open_time is a real moment (when Kalshi opened trading for this market) —
+// the one scheduling fact we can actually verify, unlike the match's own
+// start time (frozen ticker date, subject to delays — see backend). The API
+// serializes it without a timezone suffix but the value is always UTC, so
+// force that reading before converting to the viewer's local time — without
+// the 'Z', the browser would parse it as local time and shift it by
+// whatever the viewer's UTC offset is.
+const fmtOpenTime = iso => {
+  if (!iso) return 'open time unknown'
+  const withZone = iso.endsWith('Z') ? iso : `${iso}Z`
+  return new Date(withZone).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
+}
+
+const cardShellStyle = {
+  background: C.card, border: `1px solid ${C.border}`,
+  borderRadius: 4, padding: '10px 0', textAlign: 'left', cursor: 'pointer',
+  font: 'inherit', color: 'inherit', width: '100%',
+  transition: 'border-color 0.15s, transform 0.15s',
+}
+const cardHoverIn  = e => { e.currentTarget.style.borderColor = C.accentDim; e.currentTarget.style.transform = 'translateY(-1px)' }
+const cardHoverOut = e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = 'translateY(0)' }
+
+function SectionHeader({ children, live }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+      {live && (
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%', background: C.accent,
+          animation: 'livePulse 1.8s ease-in-out infinite',
+        }} />
+      )}
+      <span style={{ color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        {children}
+      </span>
+    </div>
+  )
+}
+
+const cardGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10 }
+
+// A row on an upcoming-match card reads like a scorebug: name left, price
+// right in tabular digits, with a felt-yellow rail marking whoever the
+// market favors.
+function PlayerRow({ player, leading }) {
   return (
     <div style={{
-      flex: 1, minWidth: 0,
-      background: C.surface, border: `1px solid ${C.border}`,
-      borderRadius: 5, padding: '8px 10px',
-      display: 'flex', flexDirection: 'column', gap: 4,
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '8px 10px 8px 9px',
+      borderLeft: `3px solid ${leading ? C.accent : 'transparent'}`,
     }}>
       <span style={{
-        fontSize: 12, color: C.text, overflow: 'hidden',
-        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        flex: 1, minWidth: 0, fontSize: 13,
+        color: leading ? C.text : C.muted, fontWeight: leading ? 600 : 400,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {player.name}
       </span>
       <span style={{
-        fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
-        color: player.price == null ? C.dimmer : C.accent,
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, fontWeight: 600,
+        fontVariantNumeric: 'tabular-nums', minWidth: 48, textAlign: 'right',
+        color: player.price == null ? C.dimmer : (leading ? C.accent : C.muted),
       }}>
         {player.price == null ? '—' : fmt(player.price, 3)}
       </span>
@@ -694,16 +740,184 @@ function PlayerTile({ player }) {
   )
 }
 
+// A row on a live-match card is the real scoreboard: serve dot, name, set
+// columns, current-game points, price.
+function LiveRow({ name, price, sets, point, serving }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+        background: serving ? C.accent : 'transparent',
+        boxShadow: serving ? `0 0 5px ${C.accent}` : 'none',
+      }} />
+      <span style={{
+        flex: 1, minWidth: 0, fontSize: 13, color: C.text,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {name}
+      </span>
+      {sets.map((g, i) => (
+        <span key={i} style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
+          color: i === sets.length - 1 ? C.text : C.dimmer, minWidth: 12, textAlign: 'center',
+        }}>
+          {g}
+        </span>
+      ))}
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 600, color: C.accent,
+        minWidth: 18, textAlign: 'center', borderLeft: `1px solid ${C.border}`, paddingLeft: 6,
+      }}>
+        {point}
+      </span>
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
+        fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right', color: C.muted,
+      }}>
+        {price == null ? '—' : fmt(price, 3)}
+      </span>
+    </div>
+  )
+}
+
+function LiveMatchCard({ m, onPick }) {
+  return (
+    <button
+      onClick={() => onPick(m.players[0]?.ticker)}
+      style={cardShellStyle} onMouseEnter={cardHoverIn} onMouseLeave={cardHoverOut}
+    >
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 12px 8px',
+      }}>
+        <span style={{ color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }}>
+          {m.tournament}
+        </span>
+        {m.tiebreak && (
+          <span style={{
+            fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, fontWeight: 600,
+            color: C.violet,
+          }}>
+            TIEBREAK
+          </span>
+        )}
+      </div>
+      {m.players.map((p, i) => (
+        <div key={p.ticker}>
+          <LiveRow
+            name={p.name} price={p.price} serving={m.serving === i + 1}
+            sets={(m.set_games || []).map(set => set[i])}
+            point={(m.points || [])[i]}
+          />
+          {i === 0 && <div style={{ height: 1, background: C.border, margin: '0 10px' }} />}
+        </div>
+      ))}
+    </button>
+  )
+}
+
+function UpcomingMatchCard({ m, onPick }) {
+  const [p0, p1] = m.players
+  const leadIdx = p0?.price != null && p1?.price != null && p0.price !== p1.price
+    ? (p0.price > p1.price ? 0 : 1) : -1
+  return (
+    <button
+      onClick={() => onPick(m.players[0]?.ticker)}
+      style={cardShellStyle} onMouseEnter={cardHoverIn} onMouseLeave={cardHoverOut}
+    >
+      <div style={{
+        display: 'flex', alignItems: 'baseline', gap: 6,
+        color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
+        padding: '0 12px 8px', textTransform: 'uppercase', letterSpacing: '0.04em',
+      }}>
+        <span>Market Open</span>
+        <span style={{ color: C.muted, textTransform: 'none', letterSpacing: 'normal' }}>
+          {fmtOpenTime(m.open_time)}
+        </span>
+      </div>
+      {m.players.map((p, i) => (
+        <div key={p.ticker}>
+          <PlayerRow player={p} leading={leadIdx === i} />
+          {i === 0 && <div style={{ height: 1, background: C.border, margin: '0 10px' }} />}
+        </div>
+      ))}
+    </button>
+  )
+}
+
+function CompletedRow({ name, won }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '8px 10px 8px 9px',
+      borderLeft: `3px solid ${won ? C.accent : 'transparent'}`,
+    }}>
+      <span style={{
+        flex: 1, minWidth: 0, fontSize: 13,
+        color: won ? C.text : C.muted, fontWeight: won ? 600 : 400,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {name}
+      </span>
+      {won && (
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fontWeight: 600, color: C.accent,
+        }}>
+          W
+        </span>
+      )}
+    </div>
+  )
+}
+
+function CompletedMatchCard({ m, onPick }) {
+  return (
+    <button
+      onClick={() => onPick(m.players[0]?.ticker)}
+      style={{ ...cardShellStyle, background: C.surface, opacity: 0.8 }}
+      onMouseEnter={e => { e.currentTarget.style.opacity = 1 }}
+      onMouseLeave={e => { e.currentTarget.style.opacity = 0.8 }}
+    >
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 12px 8px',
+      }}>
+        <span style={{ color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }}>
+          {fmtMatchDate(m.match_date)}
+        </span>
+        <span style={{
+          color: C.muted, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
+          fontWeight: 600, letterSpacing: '0.04em',
+        }}>
+          FINAL
+        </span>
+      </div>
+      {m.players.map((p, i) => (
+        <div key={p.ticker}>
+          <CompletedRow name={p.name} won={p.won} />
+          {i === 0 && <div style={{ height: 1, background: C.border, margin: '0 10px' }} />}
+        </div>
+      ))}
+    </button>
+  )
+}
+
 function UpcomingMatches({ onPick }) {
-  const [matches, setMatches] = useState([])
+  const [data, setData] = useState({ live: [], live_total: 0, upcoming: [], completed: [] })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${API}/markets/upcoming?limit=24`)
+    const load = () => fetch(`${API}/markets/upcoming?limit=24`)
       .then(r => r.json())
-      .then(d => setMatches(d.matches || []))
-      .catch(() => setMatches([]))
+      .then(d => setData({
+        live: d.live || [], live_total: d.live_total || 0,
+        upcoming: d.upcoming || [], completed: d.completed || [],
+      }))
+      .catch(() => {})
       .finally(() => setLoading(false))
+    load()
+    const id = setInterval(load, 10_000)
+    return () => clearInterval(id)
   }, [])
 
   if (loading) {
@@ -712,59 +926,62 @@ function UpcomingMatches({ onPick }) {
         color: C.dimmer, textAlign: 'center', padding: 40,
         fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
       }}>
-        loading upcoming ATP matches...
+        loading ATP matches...
       </div>
     )
   }
 
-  if (matches.length === 0) {
+  const { live, live_total, upcoming, completed } = data
+  const nothingAtAll = live.length === 0 && upcoming.length === 0 && completed.length === 0
+
+  if (nothingAtAll) {
     return (
       <div style={{
         color: C.dimmer, textAlign: 'center', padding: '60px 24px',
         fontFamily: "'IBM Plex Mono', monospace", fontSize: 13,
       }}>
-        no upcoming ATP matches right now — search for a market above
+        no ATP matches right now — search for a market above
       </div>
     )
   }
 
   return (
-    <div>
-      <div style={{
-        color: C.muted, fontSize: 10, textTransform: 'uppercase',
-        letterSpacing: '0.08em', marginBottom: 12,
-      }}>
-        Upcoming ATP Matches
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div>
+        <SectionHeader live>Live Matches</SectionHeader>
+        {live.length === 0 ? (
+          <div style={{
+            color: C.dimmer, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12,
+            padding: '14px 16px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 4,
+          }}>
+            {live_total === 0
+              ? 'no ATP matches are currently being played, per SofaScore'
+              : `${live_total} ATP match${live_total === 1 ? ' is' : 'es are'} live right now, but none are mapped to a Kalshi market yet — check back shortly`}
+          </div>
+        ) : (
+          <div style={cardGrid}>
+            {live.map(m => <LiveMatchCard key={m.event_id} m={m} onPick={onPick} />)}
+          </div>
+        )}
       </div>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10,
-      }}>
-        {matches.map(m => (
-          <button
-            key={m.event_ticker}
-            onClick={() => onPick(m.players[0]?.ticker)}
-            style={{
-              background: C.card, border: `1px solid ${C.border}`,
-              borderRadius: 6, padding: '12px 14px', textAlign: 'left', cursor: 'pointer',
-              font: 'inherit', color: 'inherit', width: '100%',
-            }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
-            onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
-          >
-            <div style={{
-              color: C.dimmer, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace",
-              marginBottom: 8,
-            }}>
-              {fmtMatchDate(m.match_date)}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {m.players.map(p => (
-                <PlayerTile key={p.ticker} player={p} />
-              ))}
-            </div>
-          </button>
-        ))}
-      </div>
+
+      {upcoming.length > 0 && (
+        <div>
+          <SectionHeader>Upcoming Matches</SectionHeader>
+          <div style={cardGrid}>
+            {upcoming.map(m => <UpcomingMatchCard key={m.event_ticker} m={m} onPick={onPick} />)}
+          </div>
+        </div>
+      )}
+
+      {completed.length > 0 && (
+        <div>
+          <SectionHeader>Completed Matches</SectionHeader>
+          <div style={cardGrid}>
+            {completed.map(m => <CompletedMatchCard key={m.event_ticker} m={m} onPick={onPick} />)}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -810,43 +1027,48 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: ${C.bg}; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
         input::placeholder { color: ${C.dimmer}; }
+        @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
       `}</style>
 
-      {/* Topbar */}
-      <div style={{
-        borderBottom: `1px solid ${C.border}`, padding: '0 32px',
-        display: 'flex', alignItems: 'center', height: 52, gap: 16,
-        background: C.surface,
-      }}>
-        <button
-          onClick={() => { setSelected(null); setQuery(''); setResults([]); setDropdown(false) }}
-          style={{
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600,
-            color: C.accent, letterSpacing: '0.04em',
-            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-          }}
-        >
-          BETMUSE
-        </button>
-        <span style={{ color: C.border }}>|</span>
-        <span style={{ color: C.muted, fontSize: 12 }}>prediction market analytics</span>
+      {/* Topbar — a doubles sideline: two hairlines standing in for the tramlines */}
+      <div style={{ background: C.surface }}>
+        <div style={{
+          padding: '0 32px', display: 'flex', alignItems: 'center', height: 68, gap: 14,
+        }}>
+          <button
+            onClick={() => { setSelected(null); setQuery(''); setResults([]); setDropdown(false) }}
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, fontWeight: 400,
+              color: C.accent, letterSpacing: '0.06em',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              lineHeight: 1.4, display: 'flex', alignItems: 'center',
+            }}
+          >
+            BETMUSE
+          </button>
+          <span style={{ width: 1, height: 14, background: C.border }} />
+          <span style={{ color: C.muted, fontSize: 12 }}>live win probability, every ATP match</span>
+        </div>
+        <div style={{ height: 1, background: C.border }} />
+        <div style={{ height: 1, background: C.border, opacity: 0.4, marginTop: 3 }} />
       </div>
 
       {/* Main */}
       <div style={{ maxWidth: 1440, margin: '0 auto', padding: '32px 24px' }}>
 
-        {/* Search */}
+        {/* Search — styled as a scoreboard panel: a felt-yellow edge strip */}
         <div ref={wrapRef} style={{ position: 'relative', marginBottom: 28 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             background: C.surface, border: `1px solid ${dropdownOpen ? C.accentDim : C.border}`,
-            borderRadius: dropdownOpen && results.length ? '6px 6px 0 0' : 6,
+            borderLeft: `3px solid ${dropdownOpen ? C.accent : C.dimmer}`,
+            borderRadius: dropdownOpen && results.length ? '2px 6px 0 0' : '2px 6px 6px 2px',
             padding: '10px 16px', transition: 'border-color 0.15s',
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2">
@@ -857,7 +1079,7 @@ export default function App() {
               value={query}
               onChange={e => { setQuery(e.target.value); setSelected(null) }}
               onFocus={() => results.length && setDropdown(true)}
-              placeholder="Search markets by name..."
+              placeholder="Search players or matchups..."
               style={{
                 flex: 1, background: 'transparent', border: 'none', outline: 'none',
                 color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif",

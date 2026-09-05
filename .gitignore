@@ -1,7 +1,7 @@
 /venv
 /keys
 __pycache__/
-*.pyc.env
+*.pyc
 .env
 .DS_Store
 .playwright-mcp/

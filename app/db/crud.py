@@ -19,27 +19,58 @@ def latest_snapshot(db: Session, ticker: str):
     )
 
 def get_upcoming_markets(db: Session, limit: int = 60) -> list:
-    """Markets for matches that haven't concluded: not yet started, or
-    started recently enough to plausibly still be in progress.
+    """Markets for matches that haven't concluded: not yet played, or
+    played recently enough to plausibly still be in progress or awaiting
+    resolution.
 
-    close_time is Kalshi's outer trading-window deadline (often ~2 weeks
-    out for tennis) — not a signal the match itself is over — so it can't
-    be used to exclude finished matches. open_time tracks the actual
-    scheduled start far more closely; the 8h cutoff is generous enough to
-    cover a slow best-of-5 without holding on to long-finished matches
-    that are simply awaiting Kalshi's own resolution lag (see
-    get_unresolved_markets)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=8)
-    return (
+    Neither Kalshi timestamp on market_meta is a reliable "is the match
+    still relevant" signal: close_time is the outer trading-window deadline
+    (often ~2 weeks out), and open_time is when trading opens — which is
+    *not* a fixed offset before the match; different tournaments open
+    trading anywhere from a few hours to a full day ahead, so a cutoff on
+    open_time either hides matches that are actually happening today (too
+    strict) or keeps stale ones around (too loose). The ticker-embedded
+    date (see match_mapper.ticker_date, also used for match_date display)
+    tracks the actual scheduled match day directly, so filtering happens in
+    Python against that instead of in SQL."""
+    from app.services.match_mapper import ticker_date
+
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    cutoff = today - timedelta(days=1)
+
+    candidates = (
         db.query(MarketMeta)
         .filter(MarketMeta.result.is_(None))
         .filter(MarketMeta.event_ticker.isnot(None))
-        .filter(MarketMeta.open_time.isnot(None))
-        .filter(MarketMeta.open_time > cutoff)
         .order_by(MarketMeta.open_time.asc())
-        .limit(limit)
+        .limit(max(limit * 6, 300))
         .all()
     )
+    dated = [(m, ticker_date(m.ticker)) for m in candidates]
+    dated = [(m, d) for m, d in dated if d is not None and d >= cutoff]
+    dated.sort(key=lambda pair: pair[1])
+    return [m for m, _ in dated[:limit]]
+
+
+def get_completed_markets(db: Session, limit: int = 40) -> list:
+    """Recently resolved markets, most recently played first. Bounded by
+    purge_resolved_markets (removes anything resolved more than a day ago),
+    so no extra date filtering needed here — ordering uses the
+    ticker-embedded date (see get_upcoming_markets for why that's the only
+    trustworthy per-match date we have)."""
+    from app.services.match_mapper import ticker_date
+
+    candidates = (
+        db.query(MarketMeta)
+        .filter(MarketMeta.result.isnot(None))
+        .filter(MarketMeta.event_ticker.isnot(None))
+        .order_by(MarketMeta.open_time.desc())
+        .limit(max(limit * 6, 300))
+        .all()
+    )
+    dated = [(m, ticker_date(m.ticker)) for m in candidates]
+    dated.sort(key=lambda pair: pair[1] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return [m for m, _ in dated[:limit]]
 
 
 def get_latest_prices(db: Session, tickers: list[str]) -> dict[str, float]:
