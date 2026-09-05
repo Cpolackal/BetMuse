@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Any, Protocol
 from urllib.parse import quote
@@ -66,15 +67,24 @@ def parse_event(event: dict[str, Any]) -> MatchState:
 
 class SofaScoreProvider:
     """Unofficial SofaScore live feed. Cloudflare blocks default TLS
-    fingerprints, so requests must go through curl_cffi browser impersonation."""
+    fingerprints, so requests must go through curl_cffi browser impersonation.
+    Cloud/datacenter IPs (including AWS) also get IP-reputation challenge
+    pages regardless of fingerprint, so requests are optionally routed
+    through a residential proxy via SOFASCORE_PROXY_URL."""
 
     def __init__(self):
         self._session: AsyncSession | None = None
 
-    async def fetch_live(self) -> list[MatchState]:
+    def _get_session(self) -> AsyncSession:
         if self._session is None:
-            self._session = AsyncSession(impersonate="chrome")
-        resp = await self._session.get(SOFASCORE_LIVE_URL, timeout=10)
+            proxy_url = os.getenv("SOFASCORE_PROXY_URL")
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+            self._session = AsyncSession(impersonate="chrome", proxies=proxies)
+        return self._session
+
+    async def fetch_live(self) -> list[MatchState]:
+        session = self._get_session()
+        resp = await session.get(SOFASCORE_LIVE_URL, timeout=10)
         resp.raise_for_status()
         events = resp.json().get("events", [])
         return [
@@ -87,9 +97,8 @@ class SofaScoreProvider:
         """Search events by free text (e.g. both surnames). SofaScore's own
         search does the name resolution — accents, transliteration, aliases —
         so callers only need to verify the result, not fuzzy-match it."""
-        if self._session is None:
-            self._session = AsyncSession(impersonate="chrome")
-        resp = await self._session.get(SOFASCORE_SEARCH_URL.format(query=quote(query)), timeout=10)
+        session = self._get_session()
+        resp = await session.get(SOFASCORE_SEARCH_URL.format(query=quote(query)), timeout=10)
         resp.raise_for_status()
         results = resp.json().get("results", [])
         return [
