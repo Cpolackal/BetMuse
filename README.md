@@ -1,2 +1,3 @@
 # BetMuse
-Predictive analytics for for peer to peer prediction markets
+
+A misprice detection engine for Kalshi's ATP tennis matches
