@@ -1,7 +1,8 @@
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
-from typing import Iterable, NamedTuple
+from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
+from typing import NamedTuple
 
 from app.core.match_state import MatchState
 
@@ -62,7 +63,7 @@ def ticker_date(ticker: str) -> datetime | None:
         return None
     try:
         return datetime.strptime(f"20{m.group(1)}{m.group(2)}{m.group(3)}", "%Y%b%d").replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
     except ValueError:
         return None
@@ -87,7 +88,7 @@ def select_event(
         if market_date is not None:
             if not match.start_ts:
                 continue
-            start = datetime.fromtimestamp(match.start_ts, tz=timezone.utc)
+            start = datetime.fromtimestamp(match.start_ts, tz=UTC)
             if abs(start - market_date) > DATE_TOLERANCE:
                 continue
         elif match.status not in ("inprogress", "notstarted"):

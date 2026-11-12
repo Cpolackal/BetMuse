@@ -1,7 +1,9 @@
-from itertools import islice
 import time
 from collections import deque
+from itertools import islice
+
 from pydantic import BaseModel
+
 
 class Tick(BaseModel):
     market: str
@@ -28,10 +30,9 @@ class Tick(BaseModel):
 
 
 
-class contract_buffer():
-
-    def __init__(self, maxlen=600):
-        self.items = deque(maxlen=600)
+class contract_buffer:
+    def __init__(self, maxlen: int = 600):
+        self.items = deque(maxlen=maxlen)
         self.last_seen: float = time.monotonic()
         self.last_written = None
 

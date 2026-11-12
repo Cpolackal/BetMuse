@@ -1,16 +1,24 @@
+import logging
 import time
 from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass
 from itertools import pairwise
-from app.core.contract_buffer import Tick
+
 from pydantic import ValidationError
+
+from app.core.contract_buffer import Tick
+from app.core.match_state import MatchState
 from app.services.detectors import (
-    microprice_delta,
-    volume_spike,
     imbalance_shift,
-    spread_compression,
     liquidity_drain,
+    microprice_delta,
+    spread_compression,
+    volume_spike,
 )
 from app.services.tennis_model import calibrate_serve_points, match_win_probability
+
+logger = logging.getLogger(__name__)
 
 MIN_TICKS = 25
 DELTA_THRESHOLD = 0.02
@@ -19,6 +27,7 @@ IMBALANCE_THRESHOLD = 0.1
 SPREAD_THRESHOLD = 0.01
 LIQUIDITY_THRESHOLD = -5.0
 COOLDOWN_SECONDS = 30
+ALERTS_MAXLEN = 10000
 # Ticks only arrive on book activity, so a tennis changeover (~90s) or set
 # break (~120s) shows up as a gap in arrival times. Normal between-point gaps
 # run up to ~25s; 45s separates scheduled pauses from live play.
@@ -32,6 +41,32 @@ MODEL_EDGE_PERSIST = 5
 SERVE_PRIOR_WEIGHT = 100
 
 
+@dataclass(frozen=True)
+class DetectorSpec:
+    """One microstructure detector: fires when `trigger(value)` holds, and
+    `direction(value)` names the side for the alert payload."""
+
+    alert_type: str
+    label: str
+    fn: Callable[[list[Tick]], float | None]
+    trigger: Callable[[float], bool]
+    direction: Callable[[float], str]
+
+
+DETECTORS: tuple[DetectorSpec, ...] = (
+    DetectorSpec("microprice", "microprice", microprice_delta,
+                 lambda v: abs(v) >= DELTA_THRESHOLD, lambda v: "up" if v > 0 else "down"),
+    DetectorSpec("volume", "volume spike", volume_spike,
+                 lambda v: abs(v) >= VOL_THRESHOLD, lambda v: "up" if v > 0 else "down"),
+    DetectorSpec("imbalance", "imbalance shift", imbalance_shift,
+                 lambda v: abs(v) >= IMBALANCE_THRESHOLD, lambda v: "buy" if v > 0 else "sell"),
+    DetectorSpec("spread", "spread", spread_compression,
+                 lambda v: abs(v) >= SPREAD_THRESHOLD, lambda v: "tightening" if v < 0 else "widening"),
+    DetectorSpec("liquidity", "liquidity drain", liquidity_drain,
+                 lambda v: v <= LIQUIDITY_THRESHOLD, lambda _v: "drain"),
+)
+
+
 def window_spans_pause(arrivals: deque) -> bool:
     return any(b - a > PAUSE_GAP_SECONDS for a, b in pairwise(arrivals))
 
@@ -42,7 +77,7 @@ def _mid_price(tick: Tick) -> float | None:
     return tick.price if tick.price > 0 else None
 
 
-def _posterior_serve_points(state, pa_cal: float, pb_cal: float) -> tuple[float, float]:
+def _posterior_serve_points(state: MatchState, pa_cal: float, pb_cal: float) -> tuple[float, float]:
     """Blend the once-per-match calibrated prior with this match's own
     in-play serve points (Beta-Binomial posterior mean)."""
     won_h, won_a = state.serve_won
@@ -52,12 +87,87 @@ def _posterior_serve_points(state, pa_cal: float, pb_cal: float) -> tuple[float,
     return pa, pb
 
 
+def run_detectors(window: list[Tick]) -> list[dict]:
+    """Evaluate every detector on `window`; return one alert dict per trigger."""
+    alerts = []
+    for spec in DETECTORS:
+        value = spec.fn(window)
+        if value is not None and spec.trigger(value):
+            alerts.append({
+                "type": spec.alert_type,
+                "direction": spec.direction(value),
+                "value": str(value),
+                "_log": f"{spec.label} {spec.direction(value)} {value:+.4f}",
+            })
+    return alerts
+
+
+class ModelDivergenceTracker:
+    """Per-process model state: one serve-skew calibration per match and a
+    consecutive-ticks-over-threshold streak per market."""
+
+    def __init__(self, model_prices: dict | None = None):
+        self.model_prices = model_prices
+        self.calibrations: dict[int, tuple[float, float]] = {}
+        self.edge_streaks: dict[str, int] = {}
+
+    def evaluate(self, tick: Tick, link: tuple[int, int] | None, state: MatchState | None) -> dict | None:
+        """Update the model price for `tick.market`; return an alert dict when
+        the edge has persisted long enough, else None."""
+        if link is None or state is None:
+            return None
+        if state.status != "inprogress" or state.serving not in (1, 2):
+            return None
+        event_id, side = link
+        mid = _mid_price(tick)
+        if mid is None or not 0.02 < mid < 0.98:
+            return None
+
+        params = self.calibrations.get(event_id)
+        if params is None:
+            params = calibrate_serve_points(state, mid if side == 1 else 1 - mid)
+            if params:
+                self.calibrations[event_id] = params
+                logger.info("calibrated %s pa=%.3f pb=%.3f at %.2f", tick.market, params[0], params[1], mid)
+            return None
+
+        pa, pb = _posterior_serve_points(state, *params)
+        p_home = match_win_probability(state, pa, pb)
+        if p_home is None:
+            return None
+        model_p = p_home if side == 1 else 1 - p_home
+        edge = mid - model_p
+        if self.model_prices is not None:
+            self.model_prices[tick.market] = {
+                "model_price": model_p, "market_price": mid, "edge": edge,
+                "pa": pa, "pb": pb, "ts": time.time(),
+            }
+
+        streak = self.edge_streaks.get(tick.market, 0) + 1 if abs(edge) >= MODEL_EDGE_THRESHOLD else 0
+        if streak < MODEL_EDGE_PERSIST:
+            self.edge_streaks[tick.market] = streak
+            return None
+        self.edge_streaks[tick.market] = 0
+        direction = "rich" if edge > 0 else "cheap"
+        return {
+            "type": "model_divergence", "direction": direction, "value": str(edge),
+            "model_price": str(round(model_p, 4)), "market_price": str(round(mid, 4)),
+            "_log": f"model divergence {direction} edge={edge:+.3f} (market {mid:.2f} vs model {model_p:.2f})",
+        }
+
+
+async def _emit(redis_client, market: str, alert: dict) -> None:
+    fields = {k: v for k, v in alert.items() if k != "_log"}
+    fields.update(market=market, ts=str(time.time()))
+    logger.info("[ALERT] %s %s", market, alert["_log"])
+    await redis_client.xadd("alerts", fields, maxlen=ALERTS_MAXLEN)
+
+
 async def alert_engine(redis_client, match_states=None, market_links=None, model_prices=None):
     last_alerted: dict[str, float] = {}
     windows: dict[str, deque] = {}
     arrivals: dict[str, deque] = {}
-    calibrations: dict[int, tuple[float, float]] = {}
-    edge_streaks: dict[str, int] = {}
+    tracker = ModelDivergenceTracker(model_prices)
 
     while True:
         result = await redis_client.xreadgroup(
@@ -72,126 +182,40 @@ async def alert_engine(redis_client, match_states=None, market_links=None, model
         _, entries = result[0]
         for msg_id, fields in entries:
             try:
-                ticked = Tick.model_validate_json(fields["ticks"])
-
-                window = windows.setdefault(ticked.market, deque(maxlen=MIN_TICKS))
-                window.append(ticked)
+                tick = Tick.model_validate_json(fields["ticks"])
+            except ValidationError:
+                logger.warning("dropping invalid tick %s", msg_id, exc_info=True)
+                await redis_client.xack("ticks", "alert_engine", msg_id)
+                continue
+            try:
+                window = windows.setdefault(tick.market, deque(maxlen=MIN_TICKS))
+                window.append(tick)
                 # Stream IDs are "<unix_ms>-<seq>": the time the tick hit the
                 # stream, which stays correct even when replaying a backlog.
-                arrival_times = arrivals.setdefault(ticked.market, deque(maxlen=MIN_TICKS))
+                arrival_times = arrivals.setdefault(tick.market, deque(maxlen=MIN_TICKS))
                 arrival_times.append(float(str(msg_id).split("-")[0]) / 1000.0)
 
                 if len(window) < MIN_TICKS:
-                    await redis_client.xack("ticks", "alert_engine", msg_id)
                     continue
-
                 # Baseline-vs-recent comparisons are meaningless across a
                 # changeover; skip until the window refills with live-play ticks.
                 if window_spans_pause(arrival_times):
-                    await redis_client.xack("ticks", "alert_engine", msg_id)
                     continue
-
                 now = time.monotonic()
-                if now - last_alerted.get(ticked.market, 0) < COOLDOWN_SECONDS:
-                    await redis_client.xack("ticks", "alert_engine", msg_id)
+                if now - last_alerted.get(tick.market, 0) < COOLDOWN_SECONDS:
                     continue
 
-                window_list = list(window)
-                fired = False
-
-                delta = microprice_delta(window_list)
-                if delta is not None and abs(delta) >= DELTA_THRESHOLD:
-                    direction = "up" if delta > 0 else "down"
-                    print(f"[ALERT] {ticked.market} microprice {direction} {delta:+.4f}")
-                    await redis_client.xadd("alerts", {
-                        "market": ticked.market, "type": "microprice",
-                        "direction": direction, "value": str(delta), "ts": str(time.time()),
-                    }, maxlen=10000)
-                    fired = True
-
-                vol_diff = volume_spike(window_list)
-                if vol_diff is not None and abs(vol_diff) >= VOL_THRESHOLD:
-                    direction = "up" if vol_diff > 0 else "down"
-                    print(f"[ALERT] {ticked.market} volume spike {direction} {vol_diff:+.4f}")
-                    await redis_client.xadd("alerts", {
-                        "market": ticked.market, "type": "volume",
-                        "direction": direction, "value": str(vol_diff), "ts": str(time.time()),
-                    }, maxlen=10000)
-                    fired = True
-
-                imbalance = imbalance_shift(window_list)
-                if imbalance is not None and abs(imbalance) >= IMBALANCE_THRESHOLD:
-                    direction = "buy" if imbalance > 0 else "sell"
-                    print(f"[ALERT] {ticked.market} imbalance shift {direction} {imbalance:+.4f}")
-                    await redis_client.xadd("alerts", {
-                        "market": ticked.market, "type": "imbalance",
-                        "direction": direction, "value": str(imbalance), "ts": str(time.time()),
-                    }, maxlen=10000)
-                    fired = True
-
-                compression = spread_compression(window_list)
-                if compression is not None and abs(compression) >= SPREAD_THRESHOLD:
-                    direction = "tightening" if compression < 0 else "widening"
-                    print(f"[ALERT] {ticked.market} spread {direction} {compression:+.4f}")
-                    await redis_client.xadd("alerts", {
-                        "market": ticked.market, "type": "spread",
-                        "direction": direction, "value": str(compression), "ts": str(time.time()),
-                    }, maxlen=10000)
-                    fired = True
-
-                drain = liquidity_drain(window_list)
-                if drain is not None and drain <= LIQUIDITY_THRESHOLD:
-                    print(f"[ALERT] {ticked.market} liquidity drain {drain:+.4f}")
-                    await redis_client.xadd("alerts", {
-                        "market": ticked.market, "type": "liquidity",
-                        "direction": "drain", "value": str(drain), "ts": str(time.time()),
-                    }, maxlen = 10000)
-                    fired = True
-
+                alerts = run_detectors(list(window))
                 if match_states is not None and market_links is not None:
-                    link = market_links.get(ticked.market)
+                    link = market_links.get(tick.market)
                     state = match_states.get(link[0]) if link else None
-                    if state is not None and state.status == "inprogress" and state.serving in (1, 2):
-                        event_id, side = link
-                        mid = _mid_price(ticked)
-                        if mid is not None and 0.02 < mid < 0.98:
-                            home_target = mid if side == 1 else 1 - mid
-                            params = calibrations.get(event_id)
-                            if params is None:
-                                params = calibrate_serve_points(state, home_target)
-                                if params:
-                                    calibrations[event_id] = params
-                                    print(f"[ALERT-ENGINE] calibrated {ticked.market} pa={params[0]:.3f} pb={params[1]:.3f} at {mid:.2f}")
-                            else:
-                                pa_live, pb_live = _posterior_serve_points(state, *params)
-                                p_home = match_win_probability(state, pa_live, pb_live)
-                                if p_home is not None:
-                                    model_p = p_home if side == 1 else 1 - p_home
-                                    edge = mid - model_p
-                                    if model_prices is not None:
-                                        model_prices[ticked.market] = {
-                                            "model_price": model_p, "market_price": mid,
-                                            "edge": edge, "pa": pa_live, "pb": pb_live,
-                                            "ts": time.time(),
-                                        }
-                                    if abs(edge) >= MODEL_EDGE_THRESHOLD:
-                                        edge_streaks[ticked.market] = edge_streaks.get(ticked.market, 0) + 1
-                                    else:
-                                        edge_streaks[ticked.market] = 0
-                                    if edge_streaks[ticked.market] >= MODEL_EDGE_PERSIST:
-                                        direction = "rich" if edge > 0 else "cheap"
-                                        print(f"[ALERT] {ticked.market} model divergence {direction} edge={edge:+.3f} (market {mid:.2f} vs model {model_p:.2f})")
-                                        await redis_client.xadd("alerts", {
-                                            "market": ticked.market, "type": "model_divergence",
-                                            "direction": direction, "value": str(edge), "ts": str(time.time()),
-                                            "model_price": str(round(model_p, 4)), "market_price": str(round(mid, 4)),
-                                        }, maxlen=10000)
-                                        edge_streaks[ticked.market] = 0
-                                        fired = True
+                    divergence = tracker.evaluate(tick, link, state)
+                    if divergence:
+                        alerts.append(divergence)
 
-                if fired:
-                    last_alerted[ticked.market] = now
-
-            except ValidationError:
-                pass
-            await redis_client.xack("ticks", "alert_engine", msg_id)
+                for alert in alerts:
+                    await _emit(redis_client, tick.market, alert)
+                if alerts:
+                    last_alerted[tick.market] = now
+            finally:
+                await redis_client.xack("ticks", "alert_engine", msg_id)

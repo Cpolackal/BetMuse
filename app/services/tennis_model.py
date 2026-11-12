@@ -6,7 +6,7 @@ are from the home player's perspective. Assumes a 7-point tiebreak at 6-6 in
 every set (no 10-point final-set breakers).
 """
 
-from functools import lru_cache
+from functools import cache
 
 from app.core.match_state import MatchState
 
@@ -17,7 +17,7 @@ BASE_SERVE_WIN = 0.645
 MAX_SKEW = 0.2
 
 
-@lru_cache(maxsize=None)
+@cache
 def game_win_prob(p: float, a: int = 0, b: int = 0) -> float:
     """P(server wins the game) from server points a, receiver points b."""
     if a >= 4 and a - b >= 2:
@@ -38,7 +38,7 @@ def _tb_point_server(first: int, points_played: int) -> int:
     return first if ((points_played + 1) // 2) % 2 == 0 else 3 - first
 
 
-@lru_cache(maxsize=None)
+@cache
 def tb_win_prob(pa: float, pb: float, a: int, b: int, first: int) -> float:
     """P(home wins the tiebreak) from points (a, b); `first` served point 1."""
     if a >= 7 and a - b >= 2:
@@ -49,14 +49,14 @@ def tb_win_prob(pa: float, pb: float, a: int, b: int, first: int) -> float:
         # From any level score >= 6-6 the next two points are one on each
         # serve, so win-by-2 has a closed form.
         w = pa * (1 - pb)
-        l = (1 - pa) * pb
-        return w / (w + l)
+        lose = (1 - pa) * pb
+        return w / (w + lose)
     server = _tb_point_server(first, a + b)
     ph = pa if server == 1 else 1 - pb
     return ph * tb_win_prob(pa, pb, a + 1, b, first) + (1 - ph) * tb_win_prob(pa, pb, a, b + 1, first)
 
 
-@lru_cache(maxsize=None)
+@cache
 def set_win_prob(pa: float, pb: float, ga: int, gb: int, server: int) -> float:
     """P(home wins the set) from games (ga, gb); `server` serves next game."""
     if ga == 6 and gb == 6:
@@ -72,7 +72,7 @@ def set_win_prob(pa: float, pb: float, ga: int, gb: int, server: int) -> float:
     )
 
 
-@lru_cache(maxsize=None)
+@cache
 def match_from_sets(pa: float, pb: float, sh: int, sa: int, best_of: int) -> float:
     """P(home wins match) given sets won (sh, sa), fresh sets ahead. Who
     serves first in a future set is unknowable pre-set; the two cases differ

@@ -5,18 +5,16 @@ Currently provides:
 - build_websocket_auth_headers: construct Kalshi WS auth headers from env + key file.
 """
 import os
-from typing import Dict
-from datetime import datetime, timezone
 
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from app.websockets.socket_auth import (
-    load_private_key_from_file,
     get_websocket_auth_headers,
+    load_private_key_from_file,
 )
 
 
-def build_websocket_auth_headers() -> Dict[str, str] | None:
+def build_websocket_auth_headers() -> dict[str, str] | None:
     """
     Build Kalshi WebSocket auth headers using env vars and a local private key file.
 
