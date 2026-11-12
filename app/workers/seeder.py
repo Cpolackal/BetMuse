@@ -1,9 +1,12 @@
 import asyncio
+import logging
 
 from app.core.contract_buffer import Tick, contract_buffer
 from app.core.market_filter import is_allowed_market
 from app.db.crud import get_all_seeded_tickers, get_snapshots
 from app.db.session import SessionLocal
+
+logger = logging.getLogger(__name__)
 
 SEED_LIMIT = 600
 
@@ -58,6 +61,6 @@ async def seed_buffers(active_markets: dict) -> None:
         if ticker not in active_markets:
             active_markets[ticker] = buf
     if buffers:
-        print(f"[seeder] seeded {len(buffers)} markets from DB")
+        logger.info("seeded %d markets from DB", len(buffers))
     else:
-        print("[seeder] no existing snapshots — starting cold")
+        logger.info("no existing snapshots — starting cold")

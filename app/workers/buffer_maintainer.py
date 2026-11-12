@@ -1,7 +1,8 @@
 import asyncio
 
 from pydantic import ValidationError
-from app.core.contract_buffer import contract_buffer, Tick
+
+from app.core.contract_buffer import Tick, contract_buffer
 from app.db.crud import set_market
 from app.db.session import SessionLocal
 from app.services.market_service import fetch_market

@@ -140,7 +140,13 @@ DATABASE_URL=... alembic upgrade head
 
 # Backtest
 DATABASE_URL=... python scripts/backtest_divergence.py
+
+# Tests + lint (pytest/ruff config in pyproject.toml; tests need no DB or Redis)
+pytest
+ruff check app scripts tests
 ```
+
+Logging: `app/main.py` configures `logging.basicConfig` (`LOG_LEVEL` env, default INFO); modules use `logging.getLogger(__name__)` rather than `print`.
 
 ## Key Design Decisions
 
@@ -148,7 +154,7 @@ DATABASE_URL=... python scripts/backtest_divergence.py
 - **Two Redis consumer groups on `ticks`**: `buffer_maintainer` and `alert_engine` each get every message independently. The alert engine checks `active_markets` to skip ticks for markets whose buffer isn't populated yet.
 - **db_writer uses wall-clock polling, not the stream**: It snapshots only the *latest* tick per buffer every 5 seconds, not every tick — this is intentional to avoid write amplification.
 - **`markets_history` is a module-level global**: The analytics service holds per-ticker history in-process. This state is lost on restart; volume/momentum will be 0 until the 60s window re-fills.
-- **`contract_buffer.maxlen` is hardcoded at 600** regardless of the constructor argument — the `__init__` ignores its `maxlen` param and always uses 600.
+- **`contract_buffer.maxlen` defaults to 600** and is honored by the constructor; callers (`seeder`, `buffer_maintainer`) use the default.
 - **`close_time` vs `open_time`**: see **Data Retention** above — this bit us in practice (matches showed as "upcoming" for two weeks after finishing) and is worth remembering before adding any new query that needs to know whether a match is "still relevant."
 - **`fetch_market` vs the old `fetch_closed_market`**: Kalshi's regular `/markets/{ticker}` endpoint already returns `status`/`result` once a market settles; the `/historical/markets/{ticker}` endpoint 404s for these tickers and was removed.
 

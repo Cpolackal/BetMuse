@@ -5,9 +5,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.routes.alerts.route import router as alerts_router
 from app.routes.health.route import router as health_router
 from app.routes.markets.route import router as market_router
-from app.routes.alerts.route import router as alerts_router
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 # from app.routes.calibration import router as calibration_router
 # from app.websockets.market_ws import router as ws_router

@@ -4,6 +4,7 @@ import os
 import time
 
 import redis.asyncio as redis
+
 from app.core.live_state import market_links, match_states, model_prices
 from app.websockets.client import ws_loop
 from app.workers.alert_engine import alert_engine
@@ -43,10 +44,10 @@ async def setup_stream(redis_client):
     for group in groups:
         try:
             await redis_client.xgroup_create("ticks", group, id="$", mkstream=True)
-            print(f"Created group {group}")
+            logger.info("created consumer group %s", group)
         except Exception as e:
             if "BUSYGROUP" in str(e):
-                print(f"Group {group} already exists")
+                logger.debug("consumer group %s already exists", group)
             else:
                 raise
 

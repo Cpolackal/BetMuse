@@ -1,13 +1,20 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
+
+from app.core.contract_buffer import Tick
 from app.db.models.market import (
-    market_meta as MarketMeta,
-    market_snapshots as MarketSnapshot,
-    match_events as MatchEvent,
     market_links as MarketLink,
 )
-from app.core.contract_buffer import Tick
+from app.db.models.market import (
+    market_meta as MarketMeta,
+)
+from app.db.models.market import (
+    market_snapshots as MarketSnapshot,
+)
+from app.db.models.market import (
+    match_events as MatchEvent,
+)
 
 
 def latest_snapshot(db: Session, ticker: str):
@@ -35,7 +42,7 @@ def get_upcoming_markets(db: Session, limit: int = 60) -> list:
     Python against that instead of in SQL."""
     from app.services.match_mapper import ticker_date
 
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     cutoff = today - timedelta(days=1)
 
     candidates = (
@@ -69,7 +76,7 @@ def get_completed_markets(db: Session, limit: int = 40) -> list:
         .all()
     )
     dated = [(m, ticker_date(m.ticker)) for m in candidates]
-    dated.sort(key=lambda pair: pair[1] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    dated.sort(key=lambda pair: pair[1] or datetime.min.replace(tzinfo=UTC), reverse=True)
     return [m for m, _ in dated[:limit]]
 
 
@@ -95,7 +102,7 @@ def get_unresolved_markets(db: Session):
     the match keeps showing up as "upcoming" (see get_upcoming_markets).
     3h covers a slow best-of-5; a still-in-progress match's fetch just
     comes back empty and gets retried next cycle."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=3)
+    cutoff = datetime.now(UTC) - timedelta(hours=3)
     return (
         db.query(MarketMeta)
         .filter(MarketMeta.result.is_(None))
@@ -160,7 +167,7 @@ def bulk_insert_ticks(
 ):
     model_by_ticker = model_by_ticker or {}
     score_by_ticker = score_by_ticker or {}
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.add_all([
         MarketSnapshot(
             ticker=tick.market,
@@ -197,7 +204,7 @@ def insert_match_event(db: Session, event_id: int, ts: datetime, state_json: str
 
 def upsert_market_link(db: Session, ticker: str, event_id: int, side: int, home: str, away: str):
     link = db.query(MarketLink).filter(MarketLink.ticker == ticker).first()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if link:
         link.event_id = event_id
         link.side = side
@@ -224,7 +231,7 @@ def search_markets(db: Session, q: str) -> list:
     surfacing in search for as long as it sat unresolved, which was
     observed to be up to ~2 weeks."""
     from sqlalchemy import or_
-    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    cutoff = datetime.now(UTC) - timedelta(days=1)
     return (
         db.query(MarketMeta)
         .filter(MarketMeta.title.ilike(f"%{q}%"))

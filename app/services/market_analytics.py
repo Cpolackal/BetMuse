@@ -10,15 +10,14 @@ Given per-tick data, compute per-market fields:
 """
 import time
 from collections import deque
-from typing import Deque, Dict, Tuple, Any
-
+from typing import Any
 
 # In-memory sliding history per market to compute volumes & momentum
 # markets_history[ticker] = deque[(ts, price, cum_volume)]
-markets_history: Dict[str, Deque[Tuple[float, float, float]]] = {}
+markets_history: dict[str, deque[tuple[float, float, float]]] = {}
 
 
-def compute_market_analytics(ticker: str, msg: Dict[str, Any]) -> Dict[str, Any]:
+def compute_market_analytics(ticker: str, msg: dict[str, Any]) -> dict[str, Any]:
     """
     Given a raw ticker_v2 message, compute analytics for a single market:
     price, bid, ask, spread, volume_1s, volume_10s, volume_60s, momentum,
@@ -50,7 +49,9 @@ def compute_market_analytics(ticker: str, msg: Dict[str, Any]) -> Dict[str, Any]
 
     bid_size_raw = to_float(msg.get("bid_size_fp"))
     ask_size_raw = to_float(msg.get("ask_size_fp"))
-    valid = lambda v: v == v  # NaN check
+    def valid(v):
+        return v == v  # NaN check
+
     if all(map(valid, (bid_size_raw, ask_size_raw, bid, ask))):
         # Prefer true order book depth when available (orderbook_delta channel)
         liquidity = (bid_size_raw * bid) + (ask_size_raw * ask)

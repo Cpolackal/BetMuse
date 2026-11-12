@@ -1,12 +1,15 @@
 import asyncio
+import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.core.match_state import MatchState
 from app.db.crud import get_all_market_links, get_market, insert_match_event, upsert_market_link
 from app.db.session import SessionLocal
 from app.services.match_mapper import parse_title, select_event
 from app.services.score_provider import ScoreProvider, SofaScoreProvider
+
+logger = logging.getLogger(__name__)
 
 POLL_SECONDS = 5
 MAP_RETRY_SECONDS = 60
@@ -83,7 +86,7 @@ def _fetch_title(ticker: str) -> str | None:
 def _insert_match_event(event_id: int, state: MatchState) -> None:
     db = SessionLocal()
     try:
-        insert_match_event(db, event_id, datetime.now(timezone.utc), state.compact_json())
+        insert_match_event(db, event_id, datetime.now(UTC), state.compact_json())
     finally:
         db.close()
 
@@ -133,13 +136,13 @@ async def score_feed(
     for ticker, link in preloaded.items():
         market_links.setdefault(ticker, link)
     if preloaded:
-        print(f"[score_feed] preloaded {len(preloaded)} market link(s) from db")
+        logger.info("preloaded %d market link(s) from db", len(preloaded))
 
     while True:
         try:
             live = await provider.fetch_live()
-        except Exception as e:
-            print(f"[score_feed] fetch failed: {e}")
+        except Exception:
+            logger.exception("score fetch failed")
             await asyncio.sleep(POLL_SECONDS)
             continue
 
@@ -185,8 +188,8 @@ async def score_feed(
                 continue
             try:
                 candidates = await provider.search_events(parsed.query)
-            except Exception as e:
-                print(f"[score_feed] search failed for {ticker}: {e}")
+            except Exception:
+                logger.exception("event search failed for %s", ticker)
                 continue
             link = select_event(parsed, candidates, ticker=ticker)
             if link:
@@ -195,6 +198,6 @@ async def score_feed(
                 matched = next((c for c in candidates if c.event_id == event_id), None)
                 home, away = (matched.home, matched.away) if matched else ("", "")
                 await asyncio.to_thread(_upsert_link, ticker, event_id, side, home, away)
-                print(f"[score_feed] mapped {ticker} -> event {link[0]} (side {link[1]})")
+                logger.info("mapped %s -> event %s (side %s)", ticker, link[0], link[1])
 
         await asyncio.sleep(POLL_SECONDS)

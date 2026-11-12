@@ -1,11 +1,15 @@
 import json
-from typing import Dict, Any
+import logging
+from typing import Any
 
 import websockets
+
 from app.core.contract_buffer import Tick
 from app.core.market_filter import is_allowed_market
-from app.services.market_analytics import compute_market_analytics
 from app.services.kalshi_auth_service import build_websocket_auth_headers
+from app.services.market_analytics import compute_market_analytics
+
+logger = logging.getLogger(__name__)
 
 WS_URL = "wss://api.elections.kalshi.com/trade-api/ws/v2"
 
@@ -18,7 +22,7 @@ async def subscribe_to_ticker(websocket):
     }))
 
 
-async def process_message(message: str, redis_client) -> Dict[str, Any] | None:
+async def process_message(message: str, redis_client) -> dict[str, Any] | None:
     try:
         data = json.loads(message)
     except json.JSONDecodeError:
@@ -71,7 +75,7 @@ async def process_message(message: str, redis_client) -> Dict[str, Any] | None:
 async def ws_loop(redis_client):
     headers = build_websocket_auth_headers()
     extra_headers = list(headers.items()) if headers else []
-    print("beginning connection to ws")
+    logger.info("connecting to Kalshi WebSocket")
     async with websockets.connect(
         WS_URL,
         additional_headers=extra_headers,
@@ -79,16 +83,12 @@ async def ws_loop(redis_client):
         ping_timeout=10,
         close_timeout=5,
     ) as websocket:
-        print("Connected to Kalshi WebSocket")
+        logger.info("connected to Kalshi WebSocket")
         await subscribe_to_ticker(websocket)
-        print("Subscribed to ticker")
+        logger.info("subscribed to ticker channel")
 
         async for raw in websocket:
             try:
-                parsed = await process_message(raw, redis_client)
-                if parsed and parsed.get("type") == "ticker":
-                    ticker = parsed.get("msg", {}).get("market_ticker")
-                    price = parsed.get("msg", {}).get("price")
-                    print("ticker:", ticker, price)
-            except Exception as e:
-                print("Error processing message:", e)
+                await process_message(raw, redis_client)
+            except Exception:
+                logger.exception("error processing websocket message")
