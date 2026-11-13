@@ -1,4 +1,5 @@
 import base64
+import os
 import time
 
 from cryptography.exceptions import InvalidSignature
@@ -45,3 +46,17 @@ def sign_pss_text(private_key: rsa.RSAPrivateKey, text: str) -> str:
         return base64.b64encode(signature).decode('utf-8')
     except InvalidSignature as e:
         raise ValueError("RSA sign PSS failed") from e
+
+
+def build_websocket_auth_headers() -> dict[str, str] | None:
+    """Build Kalshi WebSocket auth headers from the environment.
+
+    Expects KALSHI_API_KEY and, optionally, KALSHI_PRIVATE_KEY_PATH (defaults
+    to keys/kalshi-socket.pem). Returns the three required headers, or None if
+    the key or key file is missing.
+    """
+    api_key = os.getenv("KALSHI_API_KEY")
+    key_path = os.getenv("KALSHI_PRIVATE_KEY_PATH", "keys/kalshi-socket.pem")
+    if not api_key or not os.path.isfile(key_path):
+        return None
+    return get_websocket_auth_headers(api_key, load_private_key_from_file(key_path))

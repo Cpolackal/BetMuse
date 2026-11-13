@@ -6,7 +6,7 @@ import time
 import redis.asyncio as redis
 
 from app.core.live_state import market_links, match_states, model_prices
-from app.websockets.client import ws_loop
+from app.kalshi.stream import ws_loop
 from app.workers.alert_engine import alert_engine
 from app.workers.backstop import backstop
 from app.workers.buffer_maintainer import buffer_maintainer

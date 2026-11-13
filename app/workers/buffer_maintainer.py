@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from app.core.contract_buffer import Tick, contract_buffer
 from app.db.crud import set_market
 from app.db.session import SessionLocal
-from app.services.market_service import fetch_market
+from app.kalshi.rest import fetch_market
 
 
 async def buffer_maintainer(redis_client, active_markets: dict):

@@ -15,8 +15,8 @@ from app.db.crud import (
     set_market,
 )
 from app.db.session import get_db
+from app.kalshi.rest import fetch_markets
 from app.services import landing_page
-from app.services.market_service import fetch_markets
 
 router = APIRouter()
 

@@ -13,7 +13,6 @@ from app.routes.markets.route import router as market_router
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 # from app.routes.calibration import router as calibration_router
-# from app.websockets.market_ws import router as ws_router
 
 
 @asynccontextmanager

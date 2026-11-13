@@ -35,7 +35,7 @@ Kalshi WS  ──►  ws_loop  ──►  Redis Stream "ticks"
 
 | Worker | File | How triggered | Purpose |
 |---|---|---|---|
-| `ws_loop` | `app/websockets/client.py` | Continuous WS stream | Connects to Kalshi, deserializes ticker_v2 messages, computes analytics, writes `Tick` objects to Redis stream `ticks` |
+| `ws_loop` | `app/kalshi/stream.py` | Continuous WS stream | Connects to Kalshi, deserializes ticker_v2 messages, computes analytics, writes `Tick` objects to Redis stream `ticks` |
 | `buffer_maintainer` | `app/workers/buffer_maintainer.py` | Redis consumer group `buffer_maintainer` | Creates/updates per-market `contract_buffer` in `active_markets`; on first-seen market, fetches metadata from Kalshi REST and upserts `market_meta` via `set_market` |
 | `alert_engine` | `app/workers/alert_engine.py` | Redis consumer group `alert_engine` | Reads ticks, runs detectors against the in-memory buffer tail, writes fired signals to Redis stream `alerts` (maxlen 10000); 30s per-market cooldown; suppresses all detectors while the 25-tick window straddles a >45s arrival gap (tennis changeover/set break), using stream-ID timestamps. Joins ticks to `match_states` via `market_links` for the `model_divergence` detector, and publishes a `model_prices` entry (`app/core/live_state.py`) on every tick it evaluates — not just when an alert fires — so the frontend and `db_writer` always have a current model price to read |
 | `db_writer` | `app/workers/db_writer.py` | `asyncio.sleep(5)` interval | Snapshots the latest tick from each dirty buffer to `market_snapshots` via `bulk_insert_ticks`, stamping `model_price` (from `live_state.model_prices`) and `score_state` (compact JSON from `live_state.match_states`, via `market_links`) onto each row when available |
@@ -108,7 +108,7 @@ Managed by Alembic (`alembic upgrade head`). Four tables. All timestamp columns 
 
 ## Authentication
 
-Kalshi WebSocket auth uses RSA-PSS signatures. `app/websockets/socket_auth.py` signs `{timestamp_ms}GET/trade-api/ws/v2` with a PEM private key and returns three headers: `KALSHI-ACCESS-KEY`, `KALSHI-ACCESS-SIGNATURE`, `KALSHI-ACCESS-TIMESTAMP`.
+Kalshi WebSocket auth uses RSA-PSS signatures. `app/kalshi/auth.py` signs `{timestamp_ms}GET/trade-api/ws/v2` with a PEM private key and returns three headers: `KALSHI-ACCESS-KEY`, `KALSHI-ACCESS-SIGNATURE`, `KALSHI-ACCESS-TIMESTAMP`.
 
 REST API calls (market fetch, historical) are unauthenticated public endpoints.
 

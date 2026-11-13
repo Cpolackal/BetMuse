@@ -6,7 +6,7 @@ import websockets
 
 from app.core.contract_buffer import Tick
 from app.core.market_filter import is_allowed_market
-from app.services.kalshi_auth_service import build_websocket_auth_headers
+from app.kalshi.auth import build_websocket_auth_headers
 from app.services.market_analytics import compute_market_analytics
 
 logger = logging.getLogger(__name__)
