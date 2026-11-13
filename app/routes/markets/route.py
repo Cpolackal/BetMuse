@@ -1,5 +1,4 @@
 import asyncio
-import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -16,8 +15,8 @@ from app.db.crud import (
     set_market,
 )
 from app.db.session import get_db
+from app.services import landing_page
 from app.services.market_service import fetch_markets
-from app.services.match_mapper import player_full_name, ticker_date
 
 router = APIRouter()
 
@@ -50,105 +49,25 @@ async def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db
 
 @router.get("/upcoming")
 async def upcoming_matches(limit: int = Query(20, ge=1, le=50), db: Session = Depends(get_db)):
-    # --- Live: straight from SofaScore's live response (live_state.match_states),
-    # not any persisted/cached signal — this is exactly "what SofaScore says
-    # is live right now", refreshed every 5s, so it can't go stale the way a
-    # database reading could. live_total counts every live ATP match
-    # SofaScore reports, whether or not it has a Kalshi market mapped yet,
-    # so the frontend can distinguish "nothing is being played" from
-    # "matches are live, just not mapped to a market yet".
-    by_event: dict[int, list[tuple[str, int]]] = {}
-    for ticker, link in market_links.items():
-        by_event.setdefault(link[0], []).append((ticker, link[1]))
-
-    live_total = len(match_states)
-    live_candidates = [
-        (event_id, state, by_event[event_id])
-        for event_id, state in match_states.items()
-        if event_id in by_event
-    ]
-    live_tickers = [t for _, _, tickers in live_candidates for t, _ in tickers]
+    # Live comes straight from SofaScore's live response (live_state.match_states),
+    # refreshed every 5s, so it can't go stale the way a database reading could.
+    # live_total counts every live ATP match SofaScore reports, mapped to a
+    # Kalshi market or not, so the frontend can tell "nothing is being played"
+    # from "matches are live, just not mapped yet".
+    candidates = landing_page.live_candidates(match_states, landing_page.links_by_event(market_links))
+    live_tickers = [t for _, _, tickers in candidates for t, _ in tickers]
     live_prices = await asyncio.to_thread(get_latest_prices, db, live_tickers)
+    live = landing_page.build_live(candidates, live_prices)
+    live_event_ids = {m["event_id"] for m in live}
 
-    live = []
-    live_event_ids: set[int] = set()
-    for event_id, state, tickers in live_candidates:
-        # Home side first: the live card indexes players[0] as home when it
-        # attaches set scores, points, and the serve dot, and ticker iteration
-        # order carries no such guarantee.
-        players = [
-            {"ticker": t, "name": state.home if side == 1 else state.away, "price": live_prices.get(t)}
-            for t, side in sorted(tickers, key=lambda pair: pair[1])
-        ]
-        if len(players) != 2:
-            continue
-        live_event_ids.add(event_id)
-        live.append({
-            "event_id": event_id,
-            "home": state.home,
-            "away": state.away,
-            "tournament": state.tournament,
-            "status": state.status,
-            "set_games": state.set_games,
-            "points": state.points,
-            "serving": state.serving,
-            "tiebreak": state.tiebreak,
-            "players": players,
-        })
-
-    # --- Upcoming: unresolved, not already shown as live ---
     rows = await asyncio.to_thread(get_upcoming_markets, db, limit * 3)
     prices = await asyncio.to_thread(get_latest_prices, db, [m.ticker for m in rows])
+    upcoming = landing_page.build_upcoming(rows, prices, market_links, live_event_ids, limit)
 
-    events: dict[str, dict] = {}
-    order: list[str] = []
-    for m in rows:
-        link = market_links.get(m.ticker)
-        if link and link[0] in live_event_ids:
-            continue
-        key = m.event_ticker
-        ev = events.get(key)
-        if ev is None:
-            ev = {
-                "event_ticker": key,
-                # open_time is when Kalshi opened trading — the one
-                # scheduling fact about this match we can actually verify.
-                # The match's own start time can't be, especially once a
-                # delay is in play (see get_upcoming_markets), so we don't
-                # claim to know it here.
-                "open_time": m.open_time,
-                "players": [],
-            }
-            events[key] = ev
-            order.append(key)
-        ev["players"].append({
-            "ticker": m.ticker,
-            "name": player_full_name(m.title) or m.title,
-            "price": prices.get(m.ticker),
-        })
-    matches = [events[k] for k in order if len(events[k]["players"]) == 2][:limit]
-
-    # --- Completed: resolved ---
     completed_rows = await asyncio.to_thread(get_completed_markets, db, limit)
-    completed_events: dict[str, dict] = {}
-    completed_order: list[str] = []
-    for m in completed_rows:
-        key = m.event_ticker
-        ev = completed_events.get(key)
-        if ev is None:
-            ev = {"event_ticker": key, "match_date": ticker_date(m.ticker), "players": []}
-            completed_events[key] = ev
-            completed_order.append(key)
-        ev["players"].append({
-            "ticker": m.ticker,
-            "name": player_full_name(m.title) or m.title,
-            "won": m.result,
-        })
-    completed = [
-        completed_events[k] for k in completed_order if len(completed_events[k]["players"]) == 2
-    ][:limit]
+    completed = landing_page.build_completed(completed_rows, limit)
 
-    return {"live": live, "live_total": live_total, "upcoming": matches, "completed": completed}
+    return {"live": live, "live_total": len(match_states), "upcoming": upcoming, "completed": completed}
 
 
 @router.get("/{ticker}/snapshots")
@@ -157,63 +76,15 @@ async def market_snapshots(
     limit: int = Query(200, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
-    def _f(v):
-        return None if v is None or (isinstance(v, float) and math.isnan(v)) else v
-
     rows = await asyncio.to_thread(get_snapshots, db, ticker, limit)
-    return {
-        "ticker": ticker,
-        "snapshots": [
-            {
-                "snapshot_time": r.snapshot_time,
-                "last_price": _f(r.last_price),
-                "yes_bid": _f(r.yes_bid),
-                "yes_ask": _f(r.yes_ask),
-                "no_bid": _f(r.no_bid),
-                "no_ask": _f(r.no_ask),
-                "spread": _f(r.spread),
-                "imbalance": _f(r.imbalance),
-                "momentum": _f(r.momentum),
-                "volume_1s": r.volume_1s,
-                "volume_10s": r.volume_10s,
-                "volume_60s": r.volume_60s,
-                "liquidity": _f(r.liquidity),
-                "open_interest": _f(r.open_interest),
-                "bid_size": _f(r.bid_size),
-                "ask_size": _f(r.ask_size),
-                "model_price": _f(r.model_price),
-            }
-            for r in rows
-        ],
-    }
+    return {"ticker": ticker, "snapshots": [landing_page.snapshot_to_dict(r) for r in rows]}
 
 
 @router.get("/{ticker}/score")
 async def market_score(ticker: str):
     link = market_links.get(ticker)
     state = match_states.get(link[0]) if link else None
-    if link is None or state is None:
-        return {"mapped": False}
-
-    event_id, side = link
-    model = model_prices.get(ticker)
-    return {
-        "mapped": True,
-        "event_id": event_id,
-        "side": side,
-        "home": state.home,
-        "away": state.away,
-        "tournament": state.tournament,
-        "status": state.status,
-        "best_of": state.best_of,
-        "set_games": state.set_games,
-        "points": state.points,
-        "serving": state.serving,
-        "tiebreak": state.tiebreak,
-        "model_price": model.get("model_price") if model else None,
-        "market_price": model.get("market_price") if model else None,
-        "edge": model.get("edge") if model else None,
-    }
+    return landing_page.score_payload(link, state, model_prices.get(ticker))
 
 
 @router.get("/{ticker}")

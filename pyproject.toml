@@ -13,3 +13,6 @@ ignore = ["B008"]  # FastAPI Depends() in argument defaults
 
 [tool.ruff.lint.per-file-ignores]
 "app/db/models/__init__.py" = ["F401"]  # side-effect imports register models with Alembic
+
+[tool.ruff.lint.isort]
+combine-as-imports = true

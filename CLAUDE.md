@@ -96,14 +96,14 @@ Managed by Alembic (`alembic upgrade head`). Four tables:
 
 **`market_links`** — persisted ticker↔event mapping (`ticker` unique, `event_id`, `side`, `home`, `away`, `linked_at`), mirrors `live_state.market_links` so mappings survive a restart without re-running SofaScore search.
 
-## Data Retention (`backstop`, `app/db/crud.py`)
+## Data Retention (`backstop`, `app/db/crud/`)
 
 **Important gotcha**: Kalshi's `close_time` is the market's outer trading-window deadline — often ~2 weeks after the actual match (the market stays open for settlement/disputes). It is **not** a signal that the match is over. Anything gated on `close_time` will treat a long-finished match as still active for two weeks. Everything below is gated on `open_time` (the actual scheduled match start) instead.
 
 - **`get_unresolved_markets`**: markets `backstop` checks against Kalshi's live `/markets/{ticker}` endpoint (via `fetch_market` — *not* `/historical/markets/{ticker}`, which 404s for tickers that are only resolved-in-place, not archived) for a settlement result. Gated on `open_time < now() - 3h`, so a match is checked starting a few hours after it plausibly finished; a still-unresolved fetch just retries next 30-min cycle.
 - **`get_upcoming_markets`** (landing page): unresolved markets with `open_time > now() - 8h` — excludes long-finished matches still awaiting resolution, without hiding a slow live match.
 - **`search_markets`**: resolved markets are always searchable (bounded by the purge below); unresolved ones are excluded once `open_time` is more than a day in the past, so a market `backstop` hasn't caught up to yet doesn't linger in search indefinitely.
-- **`purge_resolved_markets`**: deletes `market_meta` + `market_snapshots` + `market_links` rows for markets resolved more than a day ago. `match_events` is not touched (see above).
+- **`purge_resolved_markets`**: deletes `market_meta` + `market_snapshots` + `market_links` rows for resolved markets whose `open_time` is more than a day ago. `open_time` is a proxy — there is no `resolved_at` column, and trading opens hours to a day before play — so a market is purged roughly 1–2 days after its match. Resolved markets with a NULL `open_time` are never purged. `match_events` is not touched (see above).
 - **`purge_snapshots`**: a flat 7-day snapshot purge, as a safety net for markets that never resolve (stuck/orphaned) — bounded, not the primary retention mechanism.
 
 ## Authentication

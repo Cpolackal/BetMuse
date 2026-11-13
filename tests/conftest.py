@@ -4,8 +4,10 @@ os.environ.setdefault("DATABASE_URL", "sqlite://")  # engine is lazy; tests neve
 
 import pytest
 
-from app.core.contract_buffer import Tick
-from app.core.match_state import MatchState
+pytest_plugins = ["tests.pg"]
+
+from app.core.contract_buffer import Tick  # noqa: E402
+from app.core.match_state import MatchState  # noqa: E402
 
 
 @pytest.fixture
