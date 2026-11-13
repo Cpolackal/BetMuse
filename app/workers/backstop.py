@@ -4,7 +4,7 @@ import time
 
 from app.db.crud import get_unresolved_markets, purge_resolved_markets, purge_snapshots, resolve_market
 from app.db.session import SessionLocal
-from app.services.market_service import fetch_market
+from app.kalshi.rest import fetch_market
 
 logger = logging.getLogger(__name__)
 
