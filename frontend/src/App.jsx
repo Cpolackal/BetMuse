@@ -673,13 +673,13 @@ const fmtMatchDate = iso => {
 // open_time is a real moment (when Kalshi opened trading for this market) —
 // the one scheduling fact we can actually verify, unlike the match's own
 // start time (frozen ticker date, subject to delays — see backend). The API
-// serializes it without a timezone suffix but the value is always UTC, so
-// force that reading before converting to the viewer's local time — without
-// the 'Z', the browser would parse it as local time and shift it by
-// whatever the viewer's UTC offset is.
+// serializes timestamps with an explicit UTC offset, so the browser converts
+// them to the viewer's local time correctly. A bare timestamp (no offset)
+// would be read as local time, so assume UTC for those just in case.
+const HAS_OFFSET = /(Z|[+-]\d{2}:?\d{2})$/i
 const fmtOpenTime = iso => {
   if (!iso) return 'open time unknown'
-  const withZone = iso.endsWith('Z') ? iso : `${iso}Z`
+  const withZone = HAS_OFFSET.test(iso) ? iso : `${iso}Z`
   return new Date(withZone).toLocaleString('en-US', {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   })

@@ -86,7 +86,7 @@ Standalone script (`python scripts/backtest_divergence.py`, run from repo root).
 
 ## Database Schema
 
-Managed by Alembic (`alembic upgrade head`). Four tables:
+Managed by Alembic (`alembic upgrade head`). Four tables. All timestamp columns are `timestamptz` (migration `a7f3c91d2b64`); they were naive `timestamp` before, which made comparisons depend on the Postgres session timezone. API responses serialize them with an explicit UTC offset.
 
 **`market_meta`** — one row per market ticker. Fields: `ticker` (unique), `event_ticker`, `series_ticker`, `title`, `open_time`, `close_time`, `result` (nullable bool). Indexed on `ticker`, `event_ticker`, `series_ticker`.
 

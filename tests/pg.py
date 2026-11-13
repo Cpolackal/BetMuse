@@ -41,14 +41,14 @@ def pg_url():
     initdb, pg_ctl = _find_bin("initdb"), _find_bin("pg_ctl")
     if not (initdb and pg_ctl):
         pytest.skip("no Postgres available (set TEST_DATABASE_URL or install postgres)")
+    # Deliberately NOT UTC: timestamps are timestamptz, so nothing may depend
+    # on the session timezone. A UTC server would hide a regression.
     data = tempfile.mkdtemp(prefix="betmuse-pg-")
     port = _free_port()
     subprocess.run([initdb, "-D", data, "-U", "test", "--auth=trust", "-E", "UTF8"], check=True, capture_output=True)
-    subprocess.run(
-        [pg_ctl, "-D", data, "-o", f"-p {port} -k {data} -c listen_addresses=127.0.0.1 -c timezone=UTC", "-w", "start",
-         "-l", f"{data}/log"],
-        check=True, capture_output=True,
-    )
+    opts = f"-p {port} -k {data} -c listen_addresses=127.0.0.1 -c timezone=America/New_York"
+    start = [pg_ctl, "-D", data, "-o", opts, "-w", "start", "-l", f"{data}/log"]
+    subprocess.run(start, check=True, capture_output=True)
     try:
         yield f"postgresql+psycopg2://test@127.0.0.1:{port}/postgres"
     finally:

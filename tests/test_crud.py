@@ -7,7 +7,7 @@ import pytest
 from app.db import crud
 from app.db.models.market import market_links, market_meta, market_snapshots, match_events
 
-NOW = datetime.now(UTC).replace(tzinfo=None)
+NOW = datetime.now(UTC)
 
 
 def day_ticker(offset_days: int, suffix: str = "AAABBB-AAA") -> str:
@@ -52,6 +52,19 @@ def test_resolve_market(db):
 
 
 # ---- market selection ----
+
+def test_kalshi_iso_strings_compare_correctly_whatever_the_session_timezone(db):
+    """Kalshi sends open_time as an ISO string ending in Z, which set_market
+    stores as-is. With naive columns Postgres drops the offset on the cast, so
+    the value landed as UTC wall time and was then compared against a cutoff
+    converted to the session timezone (this test server runs in New York).
+    With timestamptz the offset is honoured and the result is the same
+    everywhere."""
+    stamp = lambda hours: (NOW - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: E731
+    crud.set_market(db, {"ticker": "old", "open_time": stamp(4)})
+    crud.set_market(db, {"ticker": "recent", "open_time": stamp(1)})
+    assert [m.ticker for m in crud.get_unresolved_markets(db)] == ["old"]
+
 
 def test_get_unresolved_markets_gates_on_open_time(db):
     add_meta(db, "old", open_time=NOW - timedelta(hours=4))
